@@ -3,10 +3,10 @@
 //   Windows: node scripts/e2e.mjs
 // Environment: E2E_OUT=<dir> for screenshots/PDF (default ./e2e-output), E2E_EXECUTABLE=<path> to test a packaged build.
 import { _electron as electron } from 'playwright-core';
-import { mkdirSync, mkdtempSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 
@@ -43,6 +43,7 @@ async function launch() {
   return { app, page };
 }
 
+const hasTool = (cmd) => spawnSync(cmd, ['-v'], { stdio: 'ignore' }).error?.code !== 'ENOENT';
 const money = (s) => Number(s.replace(/[^\d.]/g, ''));
 let { app, page } = await launch();
 
@@ -150,16 +151,21 @@ try {
     await page.getByRole('button', { name: 'Save PDF' }).click();
     for (let i = 0; i < 40 && !existsSync(pdf); i++) await page.waitForTimeout(250);
     assert.ok(existsSync(pdf), 'PDF was not written');
-    const text = execFileSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' });
-    assert.match(text, /SKP-000001/);
-    assert.match(text, /Sri Krishna Pattasu Kadai/);
-    assert.match(text, /ஸ்ரீ கிருஷ்ணா பட்டாசு கடை/, 'Tamil shop name missing from PDF text');
-    assert.match(text, /778\.50/);
-    assert.match(text, /Hydrogen|Classic Bomb/);
-    assert.match(text, /கிளாசிக் பாம்/);
-    const fonts = execFileSync('pdffonts', [pdf], { encoding: 'utf8' });
-    assert.match(fonts, /Noto/i);
-    execFileSync('pdftoppm', ['-png', '-r', '110', '-singlefile', pdf, join(out, 'invoice-reprint')]);
+    const head = readFileSync(pdf).subarray(0, 5).toString();
+    assert.equal(head, '%PDF-', 'output is not a PDF');
+    assert.ok(statSync(pdf).size > 10_000, 'PDF is suspiciously small');
+    if (hasTool('pdftotext')) {
+      const text = execFileSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' });
+      assert.match(text, /SKP-000001/);
+      assert.match(text, /Sri Krishna Pattasu Kadai/);
+      assert.match(text, /ஸ்ரீ கிருஷ்ணா பட்டாசு கடை/, 'Tamil shop name missing from PDF text');
+      assert.match(text, /778\.50/);
+      assert.match(text, /கிளாசிக் பாம்/);
+      assert.match(text, /Classic Bomb/);
+      assert.doesNotMatch(text, /DUPLICATE COPY/, 'first print must not be marked as a duplicate');
+      assert.match(execFileSync('pdffonts', [pdf], { encoding: 'utf8' }), /Noto/i);
+      execFileSync('pdftoppm', ['-png', '-r', '110', '-singlefile', pdf, join(out, 'invoice-reprint')]);
+    } else console.log('    (poppler-utils not installed: PDF text/font checks skipped)');
     await page.getByRole('button', { name: 'Preview / reprint' }).click();
     await page.getByTitle('Invoice preview').waitFor();
     await page.waitForTimeout(500);

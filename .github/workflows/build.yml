@@ -1,0 +1,96 @@
+name: Build, test and package
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint, typecheck, unit tests, end-to-end (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: System libraries for headless Electron
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 poppler-utils
+      - name: End-to-end (real Electron app, virtual display)
+        run: xvfb-run -a npm run test:e2e
+        env:
+          E2E_OUT: ${{ github.workspace }}/e2e-output
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-output-linux
+          path: e2e-output/
+
+  rpm:
+    name: Fedora RPM (build, install, run end-to-end)
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Tooling
+        run: dnf install -y nodejs npm git rpm-build xorg-x11-server-Xvfb gtk3 nss alsa-lib libXScrnSaver libXtst at-spi2-core libnotify xdg-utils poppler-utils which findutils tar xz
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run dist:rpm
+      - name: Install the RPM with dnf
+        run: dnf install -y ./release/sri-krishna-billing-*.x86_64.rpm
+      - name: End-to-end against the installed application
+        run: |
+          APP=$(rpm -ql sri-krishna-billing | grep -E '/sri-krishna-billing$' | head -n1)
+          echo "Installed binary: $APP"
+          E2E_EXECUTABLE="$APP" E2E_OUT="$GITHUB_WORKSPACE/e2e-output" xvfb-run -a node scripts/e2e.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-output-fedora
+          path: e2e-output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sri-krishna-billing-rpm
+          path: release/*.rpm
+
+  windows:
+    name: Windows installer (build, silent install, run end-to-end)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:win
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release\SriKrishnaBilling-Setup-*-win-x64.exe | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Sri Krishna Billing.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Installed application not found' }
+          "APP_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Installed at $($exe.FullName)"
+      - name: End-to-end against the installed application
+        shell: pwsh
+        run: |
+          $env:E2E_EXECUTABLE = $env:APP_EXE
+          $env:E2E_OUT = "$env:GITHUB_WORKSPACE\e2e-output"
+          node scripts/e2e.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-output-windows
+          path: e2e-output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sri-krishna-billing-windows-installer
+          path: release/SriKrishnaBilling-Setup-*.exe
