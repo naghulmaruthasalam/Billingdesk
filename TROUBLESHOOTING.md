@@ -26,6 +26,7 @@ Logs: `<data folder>/logs/main.log` (Settings → About & system shows the folde
 
 * `npm run dev` on Linux needs a display. In a container use `xvfb-run -a npm run dev`.
 * `better-sqlite3` is loaded from `app.asar.unpacked`; if packaging is changed, keep `asarUnpack` for `better-sqlite3`.
+* If `npm install` tries to compile `better-sqlite3` ("node-gyp rebuild" / "not found: make") on a machine without a C++ toolchain, run `npm ci --ignore-scripts && node node_modules/electron/install.js`: the module ships prebuilt binaries and never needs compiling.
 * If Electron's binary is missing after `npm install` (blocked download), run `node node_modules/electron/install.js`.
 * Cross-building the Windows installer on Linux requires `wine` and `wine32` (`dpkg --add-architecture i386`); on Windows it needs nothing extra.
 * Tests that touch the filesystem create temporary directories and clean up after themselves.

@@ -40,7 +40,10 @@ jobs:
       - name: Tooling
         run: dnf install -y nodejs npm git rpm-build xorg-x11-server-Xvfb gtk3 nss alsa-lib libXScrnSaver libXtst at-spi2-core libnotify xdg-utils poppler-utils which findutils tar xz
       - uses: actions/checkout@v4
-      - run: npm ci
+      # Some npm versions try `node-gyp rebuild` for better-sqlite3 (it has a binding.gyp) even though it ships
+      # prebuilt N-API binaries. Skipping install scripts avoids needing a compiler; Electron's binary is fetched explicitly.
+      - run: npm ci --ignore-scripts
+      - run: node node_modules/electron/install.js
       - run: npm run dist:rpm
       - name: Install the RPM with dnf
         run: dnf install -y ./release/sri-krishna-billing-*.x86_64.rpm
