@@ -177,7 +177,7 @@ Defaults (customisable per computer in Settings → Appearance & shortcuts; OS-r
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for operational problems. Known limits:
 
 * Real printers could not be exercised in the development container: printing was verified through the identical PDF code path (page size, fonts, Tamil), not on a physical 58 mm/80 mm thermal printer. Thermal margins and the printer's driver paper size may need adjusting on first use (use *Settings → Print test page*).
-* The Windows and Fedora packages are built, but installation and launch on real Windows/Fedora hardware are only verified by the CI workflow in this repository when it has run (see the implementation report for the exact status). Windows was additionally smoke-launched under Wine.
+* **Verification status**: GitHub Actions run [37902953209](https://github.com/naghulmaruthasalam/Billingdesk/actions/runs/37902953209) built the Fedora RPM (installed it with `dnf` in a `fedora:latest` container) and the Windows NSIS installer (silently installed on `windows-latest`), and ran the full end-to-end script against each *installed* application - all green. That is real Windows Server and Fedora, but headless CI machines: a physical thermal printer, a desktop session on the shop's own PC, and OS-specific permissions (antivirus, SELinux policy) are not covered.
 * Installers are unsigned. Auto-update is not included (the app makes no network requests by design).
 * Single computer: there is no multi-terminal sync. Two cashier PCs would need separate databases.
 * Stock is whole-number units (Box/Pkt/Pc); fractional quantities are not supported.
