@@ -10,7 +10,10 @@ interface AuthState {
   settings: AllSettings | null;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  setupOwner: (input: { username: string; displayName: string; password: string }) => Promise<string>;
+  setupOwner: (input: { username: string; displayName: string; password: string }) => Promise<void>;
+  /** One-time owner recovery code that must be acknowledged before the app opens. */
+  recoveryCode: string | null;
+  ackRecoveryCode: () => void;
   refresh: () => Promise<void>;
   reloadSettings: () => Promise<void>;
   can: (p: Permission) => boolean;
@@ -24,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [needsSetup, setNeedsSetup] = React.useState(false);
   const [user, setUser] = React.useState<SessionUser | null>(null);
   const [settings, setSettings] = React.useState<AllSettings | null>(null);
+  const [recoveryCode, setRecoveryCode] = React.useState<string | null>(null);
 
   const reloadSettings = React.useCallback(async () => {
     setSettings(await call<AllSettings>('settings:get'));
@@ -63,15 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       setupOwner: async (input) => {
         const r = await call<{ user: SessionUser; recoveryCode: string }>('auth:setup', input);
+        setRecoveryCode(r.recoveryCode);
         setNeedsSetup(false);
         setUser(r.user);
         await reloadSettings();
-        return r.recoveryCode;
       },
+      recoveryCode,
+      ackRecoveryCode: () => setRecoveryCode(null),
       can: (p) => !!user?.permissions.includes(p),
       canAny: (...p) => p.some((x) => !!user?.permissions.includes(x)),
     }),
-    [loading, needsSetup, user, settings, refresh, reloadSettings],
+    [loading, needsSetup, user, settings, recoveryCode, refresh, reloadSettings],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

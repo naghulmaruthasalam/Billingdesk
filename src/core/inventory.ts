@@ -258,8 +258,15 @@ export function recordStockCount(ctx: Ctx, input: { date: string; counts: { prod
   });
 }
 
+/**
+ * Low-stock rule: an active product is flagged when it has a minimum threshold and is at or below it, or when it is
+ * out of stock after having been stocked before. A brand-new catalogue with no counted stock is not flagged wholesale.
+ */
+export const lowStockCondition = (t = 'products'): string =>
+  `${t}.active = 1 AND ((${t}.min_stock > 0 AND ${t}.stock_qty <= ${t}.min_stock) OR (${t}.stock_qty <= 0 AND EXISTS (SELECT 1 FROM inventory_movements m WHERE m.product_id = ${t}.id)))`;
+
 export function lowStock(db: Db, limit = 100): { id: number; sku: string; nameEn: string; nameTa: string; stockQty: number; minStock: number; unit: string }[] {
-  return (db.prepare('SELECT id, sku, name_en, name_ta, stock_qty, min_stock, unit FROM products WHERE active = 1 AND stock_qty <= min_stock ORDER BY stock_qty, sort_order LIMIT ?').all(limit) as Record<string, unknown>[]).map((r) => ({
+  return (db.prepare(`SELECT id, sku, name_en, name_ta, stock_qty, min_stock, unit FROM products WHERE ${lowStockCondition()} ORDER BY stock_qty, sort_order LIMIT ?`).all(limit) as Record<string, unknown>[]).map((r) => ({
     id: r.id as number,
     sku: r.sku as string,
     nameEn: r.name_en as string,

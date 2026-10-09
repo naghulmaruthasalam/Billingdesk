@@ -7,7 +7,7 @@ import { audit } from './audit';
 import { isoNow } from './time';
 import { getSetting, putSetting } from './settings';
 import { resolveDiscountBp, type DiscountRule } from '../shared/pricing';
-import { recordMovement } from './inventory';
+import { recordMovement, lowStockCondition } from './inventory';
 
 export interface ProductDTO {
   id: number;
@@ -137,7 +137,7 @@ export function listProducts(db: Db, f: ProductFilter = {}): { rows: ProductDTO[
   if (f.activeOnly || f.sellableOnly) where.push('p.active = 1');
   if (f.sellableOnly) where.push('p.price_paise IS NOT NULL');
   if (f.reviewOnly) where.push("p.review_status = 'needs_review'");
-  if (f.lowStockOnly) where.push('p.stock_qty <= p.min_stock AND p.active = 1');
+  if (f.lowStockOnly) where.push(lowStockCondition('p'));
   const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const total = (db.prepare(`SELECT COUNT(*) c FROM products p JOIN categories c ON c.id = p.category_id ${w}`).get(...params) as { c: number }).c;
   const rows = db.prepare(`${SELECT_PRODUCT} ${w} ORDER BY p.sort_order, p.id LIMIT ? OFFSET ?`).all(...params, f.limit ?? 1000, f.offset ?? 0) as ProductRow[];

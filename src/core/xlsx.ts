@@ -2,6 +2,7 @@ import { zipSync, strToU8 } from 'fflate';
 
 /** Tiny dependency-free .xlsx writer (single sheet, inline strings, numbers) - opens in Excel/LibreOffice. */
 
+// eslint-disable-next-line no-control-regex
 const esc = (s: string) => s.replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]!).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 
 function colName(i: number): string {

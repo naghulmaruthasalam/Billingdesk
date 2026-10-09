@@ -28,14 +28,15 @@ export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLab
   return <label className={cn('text-xs font-medium text-muted-foreground', className)} {...props} />;
 }
 
+/** Wraps the control in a <label> so the visible text is the control's accessible name (and clicking it focuses the control). */
 export function Field({ label, hint, error, children, className }: { label: React.ReactNode; hint?: React.ReactNode; error?: string | null; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn('flex flex-col gap-1', className)}>
-      <Label>{label}</Label>
+    <label className={cn('flex flex-col gap-1', className)}>
+      {label ? <span className="text-xs font-medium text-muted-foreground">{label}</span> : null}
       {children}
-      {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
+      {hint && !error && <span className="text-xs text-muted-foreground">{hint}</span>}
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </label>
   );
 }
 

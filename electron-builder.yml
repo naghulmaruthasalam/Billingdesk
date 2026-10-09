@@ -1,0 +1,59 @@
+# Packaging for Sri Krishna Billing.
+#   Windows (NSIS .exe):  npm run dist:win     -> release/SriKrishnaBilling-Setup-<version>-win-x64.exe
+#   Fedora (.rpm):        npm run dist:rpm     -> release/sri-krishna-billing-<version>.x86_64.rpm
+# better-sqlite3 ships N-API prebuilt binaries for Windows and Linux, so no native rebuild step is needed.
+appId: in.srikrishna.billing
+productName: Sri Krishna Billing
+copyright: Sri Krishna Pattasu Kadai
+directories:
+  output: release
+  buildResources: resources
+npmRebuild: false
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+asar: true
+asarUnpack:
+  - "**/node_modules/better-sqlite3/prebuilds/*.node"
+files:
+  - dist/renderer/**
+  - dist-electron/main.cjs
+  - dist-electron/preload.cjs
+  - package.json
+  # Trim native add-on payload that is never loaded on Windows/Linux x64.
+  - "!**/node_modules/better-sqlite3/{deps,src,binding.gyp}/**"
+  - "!**/node_modules/better-sqlite3/prebuilds/{darwin-*,linuxmusl-*,linux-arm64,win32-arm64}.node"
+  - "!**/*.map"
+extraMetadata:
+  main: dist-electron/main.cjs
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.png
+  artifactName: SriKrishnaBilling-Setup-${version}-win-x64.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Sri Krishna Billing
+  # Uninstalling never deletes the shop's data (it lives in %APPDATA%\Sri Krishna Billing).
+  deleteAppDataOnUninstall: false
+linux:
+  target:
+    - target: rpm
+      arch: [x64]
+  icon: resources/icon.png
+  category: Office
+  maintainer: Sri Krishna Pattasu Kadai <noreply@example.invalid>
+  synopsis: Offline billing and inventory for Sri Krishna Pattasu Kadai
+  description: Offline-first point-of-sale, inventory and reporting application.
+  desktop:
+    entry:
+      Name: Sri Krishna Billing
+      Comment: Billing and inventory
+      Categories: Office;Finance;
+rpm:
+  artifactName: sri-krishna-billing-${version}.${arch}.rpm
+  packageName: sri-krishna-billing

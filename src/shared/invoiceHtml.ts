@@ -41,6 +41,8 @@ export interface PrintableInvoice {
   reprint?: boolean;
   /** Marks demonstration/test documents. */
   sample?: boolean;
+  /** Marks an unsaved bill shown as a pre-sale preview. */
+  draft?: boolean;
 }
 
 export const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -132,6 +134,7 @@ export function renderInvoiceHtml(inv: PrintableInvoice, shop: PrintableShop, op
   const ta = (s: string) => (shop.showTamil && s ? `<div class="ta">${esc(s)}</div>` : '');
   const banners =
     (inv.sample ? '<div class="sample">SAMPLE - TEST PRINT, NOT A BILL</div>' : '') +
+    (inv.draft ? '<div class="sample">DRAFT PREVIEW - NOT YET BILLED</div>' : '') +
     (inv.status === 'cancelled' ? `<div class="cancelled">CANCELLED${inv.cancelReason ? ` - ${esc(inv.cancelReason)}` : ''}</div>` : '') +
     (inv.reprint && !inv.sample ? '<div class="c" style="font-size:.85em">DUPLICATE COPY</div>' : '');
   const phones = shop.phones.filter(Boolean).join(', ');

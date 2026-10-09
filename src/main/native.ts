@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { Runtime } from '../core/runtime';
 import { AppError } from '../core/errors';
-import { buildInvoiceHtml, shopForPrint } from '../core/api';
+import { buildInvoiceHtml, recordInvoicePrint, shopForPrint } from '../core/api';
 import { LATEST_SCHEMA_VERSION } from '../core/db/schema';
 import { currentSchemaVersion } from '../core/db/connection';
 import { getSetting } from '../core/settings';
@@ -54,7 +54,9 @@ async function printHtml(state: NativeState, html: string, size: ReceiptSize, mo
             height: Math.max(40000, Math.ceil(((await wc.executeJavaScript('document.documentElement.scrollHeight')) as number) * 264.583) + 8000),
           };
     if (mode === 'pdf') {
-      const data = await wc.printToPDF({ pageSize, printBackground: true, margins: size === 'a4' ? undefined : { top: 0, bottom: 0, left: 0, right: 0 } });
+      // printToPDF takes custom sizes in inches; webContents.print takes microns.
+      const pdfSize = typeof pageSize === 'string' ? pageSize : { width: pageSize.width / 25400, height: pageSize.height / 25400 };
+      const data = await wc.printToPDF({ pageSize: pdfSize, printBackground: true, margins: size === 'a4' ? undefined : { top: 0, bottom: 0, left: 0, right: 0 } });
       const parent = state.getWindow();
       const opts = { defaultPath: suggestedName, filters: [{ name: 'PDF', extensions: ['pdf'] }] };
       const res = parent ? await dialog.showSaveDialog(parent, opts) : await dialog.showSaveDialog(opts);
@@ -147,7 +149,12 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const size = p.size ?? getSetting(rt.db, 'invoice.receipt_size');
         const html = buildInvoiceHtml(rt, rt.ctx(), p.id, size, fontBase);
         const inv = rt.db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(p.id) as { invoice_no: string };
-        return await printHtml(state, html, size, p.mode, `${inv.invoice_no}.pdf`);
+        const res = await printHtml(state, html, size, p.mode, `${inv.invoice_no}.pdf`);
+        if (res.ok) {
+          const d = res.data as { printed?: boolean; saved?: boolean };
+          if (d.printed || d.saved) recordInvoicePrint(rt.ctx(), p.id, p.mode);
+        }
+        return res;
       }
       case 'print:test': {
         const u = rt.requireUser();

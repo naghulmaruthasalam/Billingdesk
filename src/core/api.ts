@@ -65,7 +65,9 @@ export function buildInvoiceHtml(rt: Runtime, ctx: Ctx, invoiceId: number, size:
     throw new AppError('SETUP_INCOMPLETE', 'Invoice printing is disabled until the owner confirms the shop name, address and phone numbers in Settings.');
   }
   const inv = billing.getInvoice(rt.db, invoiceId);
-  const printable: PrintableInvoice = { ...inv, reprint: true };
+  // "DUPLICATE COPY" is only printed once the original has gone to the printer / PDF at least once.
+  const printedBefore = !!rt.db.prepare("SELECT 1 FROM audit_logs WHERE action = 'invoice.print' AND entity = 'invoices' AND entity_id = ? LIMIT 1").get(String(invoiceId));
+  const printable: PrintableInvoice = { ...inv, reprint: printedBefore };
   return renderInvoiceHtml(printable, shopForPrint(rt), { size: size ?? settings.getSetting(rt.db, 'invoice.receipt_size'), fontBase, autoPrint: opts.autoPrint });
 }
 
@@ -254,6 +256,11 @@ const HANDLERS: Record<string, Handler> = {
     run: () => ({ filename: 'catalogue-template.csv', mime: 'text/csv', text: toCsv([['sku', 'barcode', 'name_en', 'name_ta', 'category', 'unit', 'price', 'cost', 'min_stock', 'discount_rule', 'active', 'notes'], ['', '', 'Example Product', 'எடுத்துக்காட்டு', 'Fancy Items', 'Box', '100.00', '', '0', 'inherit', 'yes', '']]) }),
   },
 };
+
+/** Record that an invoice was sent to the printer or saved as PDF (drives the DUPLICATE COPY marker on reprints). */
+export function recordInvoicePrint(ctx: Ctx, invoiceId: number, mode: 'print' | 'pdf'): void {
+  audit(ctx, { action: 'invoice.print', entity: 'invoices', entityId: invoiceId, details: { mode } });
+}
 
 export const CHANNELS = Object.keys(HANDLERS);
 export const isKnownChannel = (c: string): boolean => Object.prototype.hasOwnProperty.call(HANDLERS, c);

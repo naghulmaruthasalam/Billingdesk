@@ -15,7 +15,6 @@
     "test": "vitest run",
     "test:e2e": "node scripts/build.mjs && node scripts/e2e.mjs",
     "fonts": "node scripts/copy-fonts.mjs",
-    "icons": "node scripts/make-icons.mjs",
     "build": "node scripts/build.mjs",
     "start": "node scripts/build.mjs && electron .",
     "pack": "node scripts/build.mjs && electron-builder --dir --publish never",
@@ -67,5 +66,6 @@
     "vite": "^7.3.7",
     "vitest": "^3.2.7",
     "zod": "^4.6.5"
-  }
+  },
+  "type": "module"
 }

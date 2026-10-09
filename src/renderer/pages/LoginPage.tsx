@@ -15,8 +15,6 @@ export function LoginPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
-  const [ack, setAck] = useState(false);
   const [recovering, setRecovering] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -28,7 +26,7 @@ export function LoginPage() {
     }
     setBusy(true);
     try {
-      if (needsSetup) setRecoveryCode(await setupOwner({ username: username.trim(), displayName: displayName.trim() || username.trim(), password }));
+      if (needsSetup) await setupOwner({ username: username.trim(), displayName: displayName.trim() || username.trim(), password });
       else await signIn(username.trim(), password);
     } catch (err) {
       setError(errMsg(err));
@@ -80,20 +78,6 @@ export function LoginPage() {
         )}
       </div>
 
-      <Dialog open={recoveryCode !== null} onOpenChange={() => undefined} locked title="Save your recovery code" description="Shown only once.">
-        <p className="mb-3 text-sm">If the owner password is ever forgotten, this code resets it without deleting any sales or stock data. Write it down and keep it somewhere safe, away from the counter.</p>
-        <div className="num !text-center select-all rounded-md border border-border bg-muted py-3 font-mono text-lg font-semibold tracking-wider" data-testid="recovery-code">
-          {recoveryCode}
-        </div>
-        <label className="mt-4 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> I have saved this code
-        </label>
-        <div className="mt-4 flex justify-end">
-          <Button disabled={!ack} onClick={() => setRecoveryCode(null)}>
-            Continue
-          </Button>
-        </div>
-      </Dialog>
       <RecoverDialog open={recovering} onOpenChange={setRecovering} />
     </div>
   );
@@ -153,5 +137,30 @@ function RecoverDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** Shown once, straight after first-run setup, before the application opens. */
+export function RecoveryCodeScreen() {
+  const { recoveryCode, ackRecoveryCode } = useAuth();
+  const [ack, setAck] = useState(false);
+  return (
+    <div className="flex h-full items-center justify-center bg-muted p-6">
+      <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm" role="dialog" aria-label="Save your recovery code">
+        <h1 className="mb-1 flex items-center gap-2 text-lg font-semibold"><KeyRound className="h-5 w-5 text-primary" /> Save your recovery code</h1>
+        <p className="mb-3 text-sm text-muted-foreground">Shown only once. If the owner password is ever forgotten, this code resets it without deleting any sales or stock data. Write it down and keep it somewhere safe, away from the counter.</p>
+        <div className="num !text-center select-all rounded-md border border-border bg-muted py-3 font-mono text-lg font-semibold tracking-wider" data-testid="recovery-code">
+          {recoveryCode}
+        </div>
+        <label className="mt-4 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> I have saved this code
+        </label>
+        <div className="mt-4 flex justify-end">
+          <Button disabled={!ack} onClick={ackRecoveryCode}>
+            Continue
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

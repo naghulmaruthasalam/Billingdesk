@@ -6,7 +6,7 @@ import { AppError } from './errors';
 import { audit } from './audit';
 import { isDateString, isoNow } from './time';
 
-export const EXPENSE_CATEGORIES = ['Rent', 'Electricity', 'Salary / Wages', 'Transport', 'Packaging', 'Licence / Fees', 'Repairs', 'Marketing', 'Other'] as const;
+export { EXPENSE_CATEGORIES } from '../shared/expenseCategories';
 
 export const expenseSchema = z.object({
   expenseDate: z.string().refine(isDateString, 'Invalid date'),

@@ -62,8 +62,16 @@ describe('inventory', () => {
     const v = await app.call('inventory:valuation');
     expect(v.totalPaise).toBe(20 * 9000);
     expect(v.productsWithoutCost).toBe(1);
-    const low = await app.call('inventory:lowStock');
-    expect(low.length).toBeGreaterThan(100); // every product with 0 stock and 0 minimum counts as low until entered
+    // A fresh catalogue is not flagged wholesale: only products with a threshold, or emptied after being stocked.
+    expect(await app.call('inventory:lowStock')).toEqual([]);
+    const p = await product(app, 'SK-046');
+    await app.call('inventory:adjust', { productId: p.id, mode: 'set', qty: 0, reason: 'sold out' });
+    const cats = await app.call('categories:list');
+    const withMin = await app.call('products:create', { nameEn: 'Threshold item', nameTa: '', categoryId: cats[0].id, unit: 'Box', pricePaise: 1000, discountRule: 'inherit', minStock: 5, active: true, openingStock: 3 });
+    const low = (await app.call('inventory:lowStock')).map((r: any) => r.sku);
+    expect(low).toEqual(expect.arrayContaining(['SK-046', withMin.sku]));
+    expect(low).toHaveLength(2);
+    expect((await app.call('products:list', { lowStockOnly: true })).rows.map((r: any) => r.sku).sort()).toEqual(low.slice().sort());
   });
 });
 

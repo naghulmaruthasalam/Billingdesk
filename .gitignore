@@ -9,3 +9,5 @@ coverage/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+release/
+e2e-output/

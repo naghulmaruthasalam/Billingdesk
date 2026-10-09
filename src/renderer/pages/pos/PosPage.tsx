@@ -85,7 +85,10 @@ export function PosPage() {
       focusSearch: () => picker.current?.focus(),
       editLine: () => {
         const k = selected ?? lines[lines.length - 1]?.key;
-        if (k) qtyRefs.current[k]?.focus(), qtyRefs.current[k]?.select();
+        if (k) {
+          qtyRefs.current[k]?.focus();
+          qtyRefs.current[k]?.select();
+        }
       },
       selectPayment: openPay,
       completeSale: openPay,

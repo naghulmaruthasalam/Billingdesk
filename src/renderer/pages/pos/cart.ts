@@ -61,6 +61,6 @@ export function draftInvoice(lines: CartLine[], totals: InvoiceTotals, s: AllSet
     duePaise: Math.max(totals.totalPaise - cashApplied - nonCash, 0),
     changePaise: Math.max(cashTendered - cashApplied, 0),
     cancelReason: null,
-    sample: true,
+    draft: true,
   };
 }

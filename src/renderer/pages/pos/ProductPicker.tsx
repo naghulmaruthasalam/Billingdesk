@@ -57,7 +57,18 @@ export const ProductPicker = forwardRef<PickerHandle, { onAdd: (p: ProductDTO, q
           /* fall through to the highlighted result */
         }
       }
-      if (rows[hi]) add(rows[hi]);
+      // The visible list may still belong to an older keystroke (search is debounced): re-query for exactly what was typed.
+      let list = rows;
+      let idx = hi;
+      if (text !== search || res.loading) {
+        try {
+          list = (await call<{ rows: ProductDTO[] }>('products:list', { search: text, categoryId: cat ?? undefined, sellableOnly: true, limit: 400 })).rows;
+          idx = 0;
+        } catch {
+          return;
+        }
+      }
+      if (list[idx]) add(list[idx]);
     } else if (e.key === 'Escape') {
       setQ('');
     }
