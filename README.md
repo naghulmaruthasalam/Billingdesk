@@ -135,7 +135,7 @@ Build each package on (or for) its platform. The commands below were run in this
 
 ```bash
 npm ci
-npm run dist:rpm      # needs rpmbuild (dnf install rpm-build / apt install rpm); fpm is downloaded by electron-builder
+npm run dist:rpm      # needs rpmbuild (dnf install rpm-build libxcrypt-compat / apt install rpm); fpm is downloaded by electron-builder
 npm run dist:win      # on Windows: no extras. On Linux: needs wine (+ wine32) for the NSIS step
 ```
 

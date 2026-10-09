@@ -38,7 +38,7 @@ jobs:
     container: fedora:latest
     steps:
       - name: Tooling
-        run: dnf install -y nodejs npm git rpm-build xorg-x11-server-Xvfb gtk3 nss alsa-lib libXScrnSaver libXtst at-spi2-core libnotify xdg-utils poppler-utils which findutils tar xz
+        run: dnf install -y nodejs npm git rpm-build libxcrypt-compat xorg-x11-server-Xvfb gtk3 nss alsa-lib libXScrnSaver libXtst at-spi2-core libnotify xdg-utils poppler-utils which findutils tar xz
       - uses: actions/checkout@v4
       # Some npm versions try `node-gyp rebuild` for better-sqlite3 (it has a binding.gyp) even though it ships
       # prebuilt N-API binaries. Skipping install scripts avoids needing a compiler; Electron's binary is fetched explicitly.
