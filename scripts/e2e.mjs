@@ -155,7 +155,10 @@ try {
     assert.equal(head, '%PDF-', 'output is not a PDF');
     assert.ok(statSync(pdf).size > 10_000, 'PDF is suspiciously small');
     if (hasTool('pdftotext')) {
-      const text = execFileSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' });
+      const txt = join(out, 'invoice-reprint.txt');
+      execFileSync('pdftotext', ['-enc', 'UTF-8', '-layout', pdf, txt]);
+      const text = readFileSync(txt, 'utf8').normalize('NFC');
+      console.log(`    pdftotext excerpt: ${JSON.stringify(text.slice(0, 160))}`);
       assert.match(text, /SKP-000001/);
       assert.match(text, /Sri Krishna Pattasu Kadai/);
       assert.match(text, /ஸ்ரீ கிருஷ்ணா பட்டாசு கடை/, 'Tamil shop name missing from PDF text');
