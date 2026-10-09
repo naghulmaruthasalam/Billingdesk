@@ -11,3 +11,4 @@ coverage/
 *.sqlite-shm
 release/
 e2e-output/
+deliver/
