@@ -1,0 +1,137 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #16251f;
+  --card: #ffffff;
+  --card-foreground: #16251f;
+  --muted: #f5f1e5; /* warm ivory */
+  --muted-foreground: #5b6b63;
+  --border: #dcd8c9;
+  --input: #cfcabb;
+  --primary: #155d43;
+  --primary-foreground: #ffffff;
+  --primary-hover: #0f4a35;
+  --secondary: #e4f3ea; /* pale green */
+  --secondary-foreground: #0f4a35;
+  --accent: #b8913a; /* restrained gold */
+  --accent-foreground: #3b2d0a;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --warning: #92610a;
+  --warning-bg: #fdf3d8;
+  --success-bg: #e4f3ea;
+  --ring: #155d43;
+  --sidebar: #155d43;
+  --sidebar-foreground: #eaf4ee;
+  --sidebar-active: #0f4a35;
+  --sidebar-muted: #a9cbb9;
+}
+
+[data-theme='dark'] {
+  --background: #101815;
+  --foreground: #e8efe9;
+  --card: #16211d;
+  --card-foreground: #e8efe9;
+  --muted: #1c2823;
+  --muted-foreground: #9db0a5;
+  --border: #2b3a33;
+  --input: #354640;
+  --primary: #3aa479;
+  --primary-foreground: #08140f;
+  --primary-hover: #4cb88b;
+  --secondary: #183428;
+  --secondary-foreground: #bfe6d3;
+  --accent: #d6b25a;
+  --accent-foreground: #1d1503;
+  --destructive: #f0786b;
+  --destructive-foreground: #1d0a07;
+  --warning: #e8c46a;
+  --warning-bg: #2d2610;
+  --success-bg: #183428;
+  --ring: #3aa479;
+  --sidebar: #0b1210;
+  --sidebar-foreground: #dbe8e0;
+  --sidebar-active: #1c2f27;
+  --sidebar-muted: #7f988b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-success-bg: var(--success-bg);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --font-sans: 'Inter', 'Noto Sans Tamil', ui-sans-serif, system-ui, sans-serif;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', 'Noto Sans Tamil', ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+/* Tamil text always uses Noto Sans Tamil, with slightly more line height for the taller glyphs. */
+.ta {
+  font-family: 'Noto Sans Tamil', 'Inter', sans-serif;
+  line-height: 1.5;
+}
+/* Prices and numeric columns: Inter with tabular numerals. */
+.num {
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
