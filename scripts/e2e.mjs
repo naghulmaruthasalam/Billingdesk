@@ -166,8 +166,8 @@ try {
       assert.match(text, /கிளாசிக் பாம்/);
       assert.match(text, /Classic Bomb/);
       assert.doesNotMatch(text, /DUPLICATE COPY/, 'first print must not be marked as a duplicate');
-      assert.match(execFileSync('pdffonts', [pdf], { encoding: 'utf8' }), /Noto/i);
-      execFileSync('pdftoppm', ['-png', '-r', '110', '-singlefile', pdf, join(out, 'invoice-reprint')]);
+      if (hasTool('pdffonts')) assert.match(execFileSync('pdffonts', [pdf], { encoding: 'utf8' }), /Noto/i);
+      if (hasTool('pdftoppm')) execFileSync('pdftoppm', ['-png', '-r', '110', '-singlefile', pdf, join(out, 'invoice-reprint')]);
     } else console.log('    (poppler-utils not installed: PDF text/font checks skipped)');
     await page.getByRole('button', { name: 'Preview / reprint' }).click();
     await page.getByTitle('Invoice preview').waitFor();
