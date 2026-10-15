@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FolderOpen, ImagePlus, Printer, Save, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CheckRow, Field, Input, Select } from '@/components/ui/form';
+import { CheckRow, Field, Input, Select, Textarea } from '@/components/ui/form';
 import { Badge, Card, Kbd, Loading, Notice, PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/misc';
 import { call, errMsg } from '@/lib/api';
 import { PrintersTab } from './PrintersTab';
@@ -114,7 +114,7 @@ export function SettingsPage() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Shop name (English)"><Input value={d['shop.name_en']} onChange={(e) => set('shop.name_en', e.target.value)} /></Field>
               <Field label="Shop name (Tamil)"><Input className="ta" value={d['shop.name_ta']} onChange={(e) => set('shop.name_ta', e.target.value)} /></Field>
-              <Field label="Address (English)" className="col-span-2"><Input value={d['shop.address']} onChange={(e) => set('shop.address', e.target.value)} /></Field>
+              <Field label="Address (English) - press Enter to start a new line on the bill" className="col-span-2"><Textarea rows={2} value={d['shop.address']} onChange={(e) => set('shop.address', e.target.value)} /></Field>
               <Field label="Address (Tamil)" className="col-span-2"><Input className="ta" value={d['shop.address_ta']} onChange={(e) => set('shop.address_ta', e.target.value)} /></Field>
               <Field label="Phone numbers (one per line)"><textarea className="min-h-[72px] w-full rounded-md border border-input bg-card px-3 py-2 text-sm" value={phones} onChange={(e) => setPhones(e.target.value)} /></Field>
               <Field label="Tax / GST registration number" hint="Leave empty unless the shop is registered. It is never filled in automatically."><Input value={d['shop.tax_id']} onChange={(e) => set('shop.tax_id', e.target.value)} /></Field>

@@ -87,11 +87,13 @@ tr{break-inside:avoid}
 .totals div{display:flex;justify-content:space-between;padding:2px 0}
 .totals .grand{font-weight:700;font-size:15px;border-top:2px solid #155D43;margin-top:4px;padding-top:6px}
 .totals .qty{font-weight:700;font-size:14px;margin-top:4px}
+.addr{white-space:pre-line}
 .foot{margin-top:18px;text-align:center;color:#444;font-size:11px;border-top:1px solid #ccc;padding-top:8px}
 .greet{margin-top:4px;font-size:14px;font-weight:700;color:#155D43;font-family:'Inter','Noto Color Emoji','Segoe UI Emoji','Apple Color Emoji',sans-serif}`
     : `@page{size:${size} auto;margin:0}
 body{width:${size === '58mm' ? '48mm' : '72mm'};margin:0 auto;padding:2mm 0;font-size:${size === '58mm' ? '10px' : '11.5px'};line-height:1.35}
 .c{text-align:center}
+.addr{white-space:pre-line;font-size:${size === '58mm' ? '9px' : '10.5px'}}
 h1{font-size:${size === '58mm' ? '12px' : '14px'};margin:2px 0;text-align:center}
 h2{font-size:${size === '58mm' ? '11px' : '12px'};margin:0;text-align:center;font-weight:600}
 .logo{display:block;margin:0 auto 3px;max-height:44px;max-width:60%}
@@ -162,7 +164,7 @@ export function renderInvoiceHtml(inv: PrintableInvoice, shop: PrintableShop, op
       )
       .join('');
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNo)}</title>${head}</head><body><div class="doc">
-<header>${shop.logoDataUrl ? `<img src="${esc(shop.logoDataUrl)}" alt="">` : ''}<div><h1>${esc(shop.nameEn)}</h1>${shop.showTamil ? `<h2 class="ta">${esc(shop.nameTa)}</h2>` : ''}<div>${esc(shop.address)}</div>${shop.showTamil && shop.addressTa ? `<div class="ta">${esc(shop.addressTa)}</div>` : ''}<div>${phones ? `Phone: ${esc(phones)}` : ''}${shop.taxId ? ` &nbsp; ${esc(shop.taxLabel)} No: ${esc(shop.taxId)}` : ''}</div></div></header>
+<header>${shop.logoDataUrl ? `<img src="${esc(shop.logoDataUrl)}" alt="">` : ''}<div><h1>${esc(shop.nameEn)}</h1>${shop.showTamil ? `<h2 class="ta">${esc(shop.nameTa)}</h2>` : ''}<div class="addr">${esc(shop.address)}</div>${shop.showTamil && shop.addressTa ? `<div class="ta">${esc(shop.addressTa)}</div>` : ''}<div>${phones ? `Phone: ${esc(phones)}` : ''}${shop.taxId ? ` &nbsp; ${esc(shop.taxLabel)} No: ${esc(shop.taxId)}` : ''}</div></div></header>
 ${banners}
 <div class="meta"><div><strong>Invoice:</strong> ${esc(inv.invoiceNo)}<br><strong>Date:</strong> ${esc(fmtDateTime(inv.createdAt))}</div><div><strong>Cashier:</strong> ${esc(inv.cashierName)}${customer ? `<br><strong>Customer:</strong> ${customer}` : ''}</div></div>
 <table><thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Rate (₹)</th><th class="r">Amount (₹)</th></tr></thead><tbody>${rows}</tbody></table>
@@ -182,7 +184,7 @@ ${banners}
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNo)}</title>${head}</head><body>
 ${shop.logoDataUrl ? `<img class="logo" src="${esc(shop.logoDataUrl)}" alt="">` : ''}
 <h1>${esc(shop.nameEn)}</h1>${shop.showTamil ? `<h2 class="ta">${esc(shop.nameTa)}</h2>` : ''}
-<div class="c">${esc(shop.address)}</div>${shop.showTamil && shop.addressTa ? `<div class="c ta">${esc(shop.addressTa)}</div>` : ''}
+<div class="c addr">${esc(shop.address)}</div>${shop.showTamil && shop.addressTa ? `<div class="c ta">${esc(shop.addressTa)}</div>` : ''}
 <div class="c">${phones ? `Ph: ${esc(phones)}` : ''}</div>${shop.taxId ? `<div class="c">${esc(shop.taxLabel)} No: ${esc(shop.taxId)}</div>` : ''}
 <hr>${banners}
 <div class="row"><span>Bill: <b>${esc(inv.invoiceNo)}</b></span><span>${esc(fmtDateTime(inv.createdAt))}</span></div>

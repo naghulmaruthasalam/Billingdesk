@@ -2,7 +2,7 @@ import type { Db } from './db/connection';
 import { tx } from './db/connection';
 import type { Ctx } from './types';
 import { seedRoles } from './auth';
-import { getSetting, putSetting, SETTING_DEFAULTS, SETTINGS_SCHEMA, type SettingKey } from './settings';
+import { getSetting, putSetting, LEGACY_DEFAULTS, SETTING_DEFAULTS, SETTINGS_SCHEMA, type SettingKey } from './settings';
 import { isoNow } from './time';
 import { auditSystem, audit } from './audit';
 import { SEED_CATEGORIES, SEED_PRODUCTS } from '../shared/catalogue';
@@ -17,6 +17,8 @@ export function ensureSeeded(db: Db, now: Date): { seededProducts: number } {
     for (const k of Object.keys(SETTINGS_SCHEMA) as SettingKey[]) {
       const has = db.prepare('SELECT 1 FROM settings WHERE key = ?').get(k);
       if (!has && k !== 'auth.recovery_hash') putSetting(db, now, k, SETTING_DEFAULTS[k] as never);
+      const legacy = LEGACY_DEFAULTS[k];
+      if (has && legacy && legacy.includes(getSetting(db, k) as string)) putSetting(db, now, k, SETTING_DEFAULTS[k] as never);
     }
     if (getSetting(db, 'catalogue.seeded')) return;
     const ts = isoNow(now);

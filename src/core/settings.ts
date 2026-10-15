@@ -72,11 +72,20 @@ export const SETTINGS_SCHEMA = {
 export type SettingKey = keyof typeof SETTINGS_SCHEMA;
 export type SettingValue<K extends SettingKey> = z.infer<(typeof SETTINGS_SCHEMA)[K]>;
 
+/** Defaults shipped in earlier builds. A database that still holds one of these (never edited by the owner) is moved to the current default. */
+export const LEGACY_DEFAULTS: Partial<Record<SettingKey, string[]>> = {
+  'shop.address': [
+    '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Kovaipudur, Coimbatore - 641017.',
+    '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Coimbatore - 641017.',
+  ],
+  'invoice.footer_en': ['Thank you. Celebrate safely!'],
+};
+
 export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'shop.name_en': 'Shree Krishna Pattasu Kadai',
   'shop.name_ta': 'ஸ்ரீ கிருஷ்ணா பட்டாசு கடை',
   // Transcribed from a photograph of the brochure. The owner must confirm before invoice printing is enabled.
-  'shop.address': '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Coimbatore - 641017.',
+  'shop.address': '4/210, J.V. Complex, Gurunthasala Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.',
   'shop.address_ta': '4/210, ஜே.வி. காம்பளக்ஸ், குருந்தாசல நகர், என்.ஜி.ஜி.ஓ. காலனி மெயின் ரோடு, கோயம்புத்தூர் - 641017.',
   'shop.phones': ['98426 81816', '98437 81816'],
   'shop.tax_id': '',

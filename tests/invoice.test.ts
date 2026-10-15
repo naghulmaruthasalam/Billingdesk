@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { makeApp, setStock, rid, expectError } from './helpers';
 import { renderInvoiceHtml, sampleInvoice, esc } from '../src/shared/invoiceHtml';
 import { shopForPrint, recordInvoicePrint, buildInvoiceHtml } from '../src/core/api';
+import { ensureSeeded } from '../src/core/seed';
+import { getSetting, SETTING_DEFAULTS } from '../src/core/settings';
 
 async function oneBill() {
   const app = await makeApp();
@@ -54,6 +56,22 @@ describe('invoice rendering', () => {
       expect(html.lastIndexOf('Happy Diwali')).toBeGreaterThan(html.indexOf('Goods once sold'));
       expect(html).not.toContain('Kovaipudur');
     }
+  });
+
+  it('prints the address on two lines exactly as set, and upgrades an untouched older default', async () => {
+    const { app, inv } = await oneBill();
+    const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size: '80mm', fontBase: '.' });
+    expect(html).toContain('4/210, J.V. Complex, Gurunthasala Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.');
+    expect(html).toContain('.addr{white-space:pre-line');
+    expect(html).not.toContain('Kovaipudur');
+    // a database still holding an earlier shipped default (never edited) is moved to the current one; edited values are left alone
+    const legacy = '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Kovaipudur, Coimbatore - 641017.';
+    await app.call('settings:update', { patch: { 'shop.address': legacy } });
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'shop.address')).toBe(SETTING_DEFAULTS['shop.address']);
+    await app.call('settings:update', { patch: { 'shop.address': 'My own address' } });
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'shop.address')).toBe('My own address');
   });
 
   it('can optionally add Tamil, marks cancelled bills, drafts and test pages', async () => {
