@@ -93,9 +93,13 @@ h2{font-size:${size === '58mm' ? '11px' : '12px'};margin:0;text-align:center;fon
 .logo{display:block;margin:0 auto 3px;max-height:44px;max-width:60%}
 hr{border:0;border-top:1px dashed #000;margin:4px 0}
 .row{display:flex;justify-content:space-between;gap:6px}
-.it{margin:3px 0;break-inside:avoid}
-.it .n{font-weight:600}
-.it .d{display:flex;justify-content:space-between;gap:6px}
+.items{width:100%;border-collapse:collapse}
+.items th{font-weight:600;padding:1px 0;border-bottom:1px solid #000;text-align:left}
+.items th.r{text-align:right}
+.items td{padding:2px 0 2px 3px;vertical-align:top;border-bottom:1px dotted #999}
+.items td:first-child,.items th:first-child{padding-left:0}
+.items tr{break-inside:avoid}
+.items .n{font-weight:600;width:100%;word-break:break-word}
 .totals .row{padding:1px 0}
 .totals .grand{font-weight:700;font-size:${size === '58mm' ? '12px' : '14px'};border-top:1px solid #000;border-bottom:1px solid #000;margin:3px 0;padding:2px 0}
 .foot{margin-top:4px;text-align:center;font-size:${size === '58mm' ? '9px' : '10px'}}`
@@ -158,11 +162,14 @@ ${banners}
 </div>${script}</body></html>`;
   }
 
-  const items = inv.lines
+  // One line per product: item, qty, price, total (the net amount for that product). A long name wraps inside its own
+  // column; the numbers stay on the first line. Any discount is shown in the totals below.
+  const showUnit = size !== '58mm';
+  const items = `<table class="items"><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>${inv.lines
     .map(
-      (l) => `<div class="it"><div class="n">${esc(l.nameEn)}</div>${ta(l.nameTa)}<div class="d"><span class="num" style="text-align:left">${l.qty} ${esc(l.unit)} x ${formatAmount(l.ratePaise)}${l.discountPaise ? ` &minus;${formatAmount(l.discountPaise)}` : ''}</span><span class="num">${formatAmount(l.netPaise)}</span></div></div>`,
+      (l) => `<tr><td class="n">${esc(l.nameEn)}${ta(l.nameTa)}</td><td class="num">${l.qty}${showUnit ? ` ${esc(l.unit)}` : ''}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${formatAmount(l.netPaise)}</td></tr>`,
     )
-    .join('');
+    .join('')}</tbody></table>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNo)}</title>${head}</head><body>
 ${shop.logoDataUrl ? `<img class="logo" src="${esc(shop.logoDataUrl)}" alt="">` : ''}
 <h1>${esc(shop.nameEn)}</h1>${shop.showTamil ? `<h2 class="ta">${esc(shop.nameTa)}</h2>` : ''}

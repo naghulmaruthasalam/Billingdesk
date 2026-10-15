@@ -182,7 +182,7 @@ export function PosPage() {
   const noItems = lines.length === 0;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_440px] gap-4">
+    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_540px] gap-4">
       <div className="flex min-h-0 flex-col gap-2">
         <div className={cn('flex h-8 shrink-0 items-center justify-between rounded-md border px-3 text-xs', lastScan ? (lastScan.ok ? 'border-primary/40 bg-secondary text-secondary-foreground' : 'border-destructive/40 bg-destructive/10 text-destructive') : 'border-border bg-card text-muted-foreground')} role="status" aria-live="polite" data-testid="scan-status">
           <span className="flex items-center gap-2">
@@ -224,71 +224,69 @@ export function PosPage() {
               Search or click a product to add it. Press <Kbd>{loadShortcuts().focusSearch}</Kbd> to search.
             </div>
           ) : (
-            lines.map((l, i) => {
+            <>
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-muted px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+              <span className="min-w-0 flex-1">Item</span>
+              <span className="w-[6.25rem] shrink-0 text-center">Qty</span>
+              <span className="w-[4.5rem] shrink-0 text-right">Price</span>
+              <span className="w-[5rem] shrink-0 text-right">Total</span>
+              <span className="w-[4.25rem] shrink-0 text-center">Disc.</span>
+              <span className="w-4 shrink-0" />
+            </div>
+            {lines.map((l, i) => {
               const t = totals.lines[i];
               const bp = lineDiscountBp(l);
               const over = l.qty > l.product.stockQty;
               return (
-                <div key={l.key} onClick={() => setSelected(l.key)} className={cn('border-b border-border/70 px-3 py-2', selected === l.key && 'bg-secondary/60')} data-testid="cart-line">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{l.product.nameEn}</div>
-                      <div className="ta truncate text-xs text-muted-foreground">{l.product.nameTa}</div>
-                    </div>
-                    <button className="text-muted-foreground hover:text-destructive" aria-label={`Remove ${l.product.nameEn}`} onClick={() => remove(l.key)}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                <div key={l.key} onClick={() => setSelected(l.key)} className={cn('flex items-center gap-2 border-b border-border/70 px-3 py-1.5', selected === l.key && 'bg-secondary/60')} data-testid="cart-line">
+                  {/* One line per product: item, qty, price, total. */}
+                  <div className="min-w-0 flex-1" title={`${l.product.nameEn}${l.product.nameTa ? ` / ${l.product.nameTa}` : ''}`}>
+                    <div className="truncate text-sm font-medium">{l.product.nameEn}</div>
                   </div>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1">
-                      <Button size="icon" variant="outline" className="h-7 w-7" aria-label="Decrease quantity" onClick={() => setQty(l.key, l.qty - 1)} disabled={l.qty <= 1}>
-                        <Minus />
-                      </Button>
-                      <input
-                        ref={(el) => {
-                          qtyRefs.current[l.key] = el;
-                        }}
-                        value={l.qty}
-                        inputMode="numeric"
-                        aria-label={`Quantity of ${l.product.nameEn}`}
-                        onChange={(e) => setQty(l.key, Number(e.target.value.replace(/\D/g, '')))}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') picker.current?.focus();
-                        }}
-                        onFocus={(e) => e.target.select()}
-                        className="num h-7 w-12 rounded-md border border-input bg-card text-center text-sm"
-                      />
-                      <Button size="icon" variant="outline" className="h-7 w-7" aria-label="Increase quantity" onClick={() => setQty(l.key, l.qty + 1)}>
-                        <Plus />
-                      </Button>
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        {l.product.unit} × {formatINR(l.product.pricePaise ?? 0)}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      {t.discountPaise > 0 && <div className="num text-xs text-muted-foreground line-through">{formatINR(t.grossPaise)}</div>}
-                      <div className="num font-semibold">{formatINR(t.netPaise)}</div>
-                    </div>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <Button size="icon" variant="outline" className="h-6 w-6" aria-label="Decrease quantity" onClick={() => setQty(l.key, l.qty - 1)} disabled={l.qty <= 1}>
+                      <Minus />
+                    </Button>
+                    <input
+                      ref={(el) => {
+                        qtyRefs.current[l.key] = el;
+                      }}
+                      value={l.qty}
+                      inputMode="numeric"
+                      aria-label={`Quantity of ${l.product.nameEn}`}
+                      title={over ? `Beyond stock (${l.product.stockQty})` : undefined}
+                      onChange={(e) => setQty(l.key, Number(e.target.value.replace(/\D/g, '')))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') picker.current?.focus();
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      className={cn('num h-6 w-9 rounded-md border bg-card text-center text-sm', over ? 'border-warning text-warning' : 'border-input')}
+                    />
+                    <Button size="icon" variant="outline" className="h-6 w-6" aria-label="Increase quantity" onClick={() => setQty(l.key, l.qty + 1)}>
+                      <Plus />
+                    </Button>
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5">
-                      {bp > 0 ? (
-                        <Badge tone={l.overrideBp !== null ? 'gold' : 'green'}>
-                          {bpToPercent(bp)}% off −{formatINR(t.discountPaise)}
-                          {l.overrideBp !== null ? ' (changed)' : ''}
-                        </Badge>
-                      ) : (
-                        <Badge tone={l.overrideBp !== null ? 'gold' : 'neutral'}>No discount{l.overrideBp !== null ? ' (changed)' : ''}</Badge>
-                      )}
-                      <button className="flex items-center gap-0.5 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => setOverride(l.key)}>
-                        <Percent className="h-3 w-3" /> change
-                      </button>
-                    </div>
-                    {over && <span className="text-warning">Beyond stock ({l.product.stockQty})</span>}
+                  <div className="num w-[4.5rem] shrink-0 text-right text-xs text-muted-foreground" title={l.product.unit}>
+                    × {formatINR(l.product.pricePaise ?? 0)}
                   </div>
+                  <div className="num w-[5rem] shrink-0 text-right text-sm font-semibold" title={bp > 0 ? `${bpToPercent(bp)}% off, -${formatINR(t.discountPaise)}` : 'No discount'}>
+                    {formatINR(t.netPaise)}
+                  </div>
+                  <button
+                    className={cn('flex w-[4.25rem] shrink-0 items-center justify-center gap-0.5 rounded px-1 text-xs underline-offset-2 hover:underline', l.overrideBp !== null ? 'text-warning' : 'text-muted-foreground hover:text-foreground')}
+                    title="Change discount for this item"
+                    aria-label={`Change discount of ${l.product.nameEn}`}
+                    onClick={() => setOverride(l.key)}
+                  >
+                    <Percent className="h-3 w-3" /> {bp > 0 ? `${bpToPercent(bp)}%` : 'No disc.'}
+                  </button>
+                  <button className="shrink-0 text-muted-foreground hover:text-destructive" aria-label={`Remove ${l.product.nameEn}`} onClick={() => remove(l.key)}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               );
-            })
+            })}
+            </>
           )}
         </div>
 

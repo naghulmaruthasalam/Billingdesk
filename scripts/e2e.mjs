@@ -193,7 +193,7 @@ try {
     assert.equal(await lines.count(), 3);
     // 65 + 2*150 + 450 = 815.00 ; discount 6.50 + 30.00 = 36.50 ; payable 778.50
     assert.equal(money(await page.getByTestId('cart-total').innerText()), 778.5);
-    await page.getByText('No discount', { exact: false }).first().waitFor();
+    await page.getByText('No disc.', { exact: false }).first().waitFor();
     await shot(page, '05-pos-cart');
     await page.keyboard.press('F8');
     await page.getByTestId('payable').waitFor();
