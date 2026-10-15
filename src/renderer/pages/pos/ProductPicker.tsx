@@ -128,7 +128,7 @@ export const ProductPicker = forwardRef<PickerHandle, { onAdd: (p: ProductDTO, q
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium">{p.nameEn}</span>
-                    {p.effectiveDiscountBp > 0 ? <Badge tone="green">{p.effectiveDiscountBp / 100}% off</Badge> : <Badge tone="neutral">No discount</Badge>}
+                    {p.effectiveDiscountBp > 0 ? null : <Badge tone="neutral">No discount</Badge>}
                   </div>
                   <div className="ta truncate text-xs text-muted-foreground">
                     {p.nameTa || '—'} · {p.sku} · {p.categoryName}

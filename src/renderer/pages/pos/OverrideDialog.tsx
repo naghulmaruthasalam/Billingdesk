@@ -4,17 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/form';
 import { Notice } from '@/components/ui/misc';
 import { bpToPercent, percentToBp } from '@shared/money';
-import type { CartLine } from './cart';
 
-/** Change the discount on one line away from the shop policy. A reason is mandatory; the change is audited. */
-export function OverrideDialog({ line, onClose, onApply }: { line: CartLine | null; onClose: () => void; onApply: (bp: number | null, reason: string) => void }) {
+/** Change the discount of the whole bill away from the shop policy. A reason is mandatory; the change is audited. */
+export function OverrideDialog({ open, policyBp, overridden, onClose, onApply }: { open: boolean; policyBp: number | null; overridden: boolean; onClose: () => void; onApply: (bp: number | null, reason: string) => void }) {
   const [pct, setPct] = useState('');
   const [reason, setReason] = useState('');
   const [step, setStep] = useState<'edit' | 'confirm'>('edit');
-  const policy = line?.product.effectiveDiscountBp ?? 0;
+  const policy = policyBp;
   const bp = percentToBp(pct);
   const valid = bp !== null && reason.trim().length >= 3;
-  const open = line !== null;
   const reset = () => {
     setStep('edit');
     setPct('');
@@ -30,11 +28,11 @@ export function OverrideDialog({ line, onClose, onApply }: { line: CartLine | nu
         }
       }}
       title="Change discount"
-      description={line ? `${line.product.nameEn} - shop policy: ${bpToPercent(policy)}%` : undefined}
+      description={`Whole bill - shop policy: ${policy === null ? 'set per product' : `${bpToPercent(policy)}%`}`}
       footer={
         step === 'edit' ? (
           <>
-            {line?.overrideBp !== null && line && (
+            {overridden && (
               <Button
                 variant="outline"
                 className="mr-auto"
@@ -44,13 +42,13 @@ export function OverrideDialog({ line, onClose, onApply }: { line: CartLine | nu
                   onClose();
                 }}
               >
-                Restore policy discount
+                Restore shop discount
               </Button>
             )}
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button disabled={!valid || bp === policy} onClick={() => setStep('confirm')}>
+            <Button disabled={!valid || (policy !== null && bp === policy)} onClick={() => setStep('confirm')}>
               Continue
             </Button>
           </>
@@ -74,9 +72,9 @@ export function OverrideDialog({ line, onClose, onApply }: { line: CartLine | nu
     >
       {step === 'edit' ? (
         <div className="flex flex-col gap-3">
-          <Notice>This replaces the policy discount for this line only; discounts are never added together.</Notice>
+          <Notice>This sets one discount for the whole bill, on the items that are normally discounted. Items with no discount (such as gift boxes) stay without. Discounts are never added together.</Notice>
           <Field label="Discount %" error={pct && bp === null ? 'Enter a number from 0 to 100' : null}>
-            <Input autoFocus inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder={bpToPercent(policy)} />
+            <Input autoFocus inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder={policy === null ? '' : bpToPercent(policy)} />
           </Field>
           <Field label="Reason (required)">
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Regular customer, damaged box" />
@@ -84,7 +82,7 @@ export function OverrideDialog({ line, onClose, onApply }: { line: CartLine | nu
         </div>
       ) : (
         <p className="text-sm">
-          The discount for <b>{line?.product.nameEn}</b> will change from the shop policy of <b>{bpToPercent(policy)}%</b> to <b>{bp !== null ? bpToPercent(bp) : ''}%</b>. This is recorded in the audit log with your reason, and may need supervisor approval when the bill is completed.
+          The discount for the <b>whole bill</b> will change from the shop policy of <b>{policy === null ? 'per-product rules' : `${bpToPercent(policy)}%`}</b> to <b>{bp !== null ? bpToPercent(bp) : ''}%</b>. This is recorded in the audit log with your reason, and may need supervisor approval when the bill is completed.
         </p>
       )}
     </Dialog>

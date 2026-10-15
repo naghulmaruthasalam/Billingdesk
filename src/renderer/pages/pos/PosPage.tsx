@@ -16,7 +16,7 @@ import { formatINR, bpToPercent } from '@shared/money';
 import type { PaymentInput } from '@shared/pricing';
 import type { Approval, CustomerDTO, InvoiceDTO, ProductDTO } from '@/lib/types';
 import { ProductPicker, type PickerHandle } from './ProductPicker';
-import { cartTotals, lineDiscountBp, type CartLine, type CustomerInput } from './cart';
+import { cartTotals, type CartLine, type CustomerInput } from './cart';
 import { OverrideDialog } from './OverrideDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { SaleDoneDialog } from './SaleDoneDialog';
@@ -34,7 +34,7 @@ export function PosPage() {
   const [busy, setBusy] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [done, setDone] = useState<InvoiceDTO | null>(null);
-  const [override, setOverride] = useState<string | null>(null);
+  const [override, setOverride] = useState(false);
   const [approvalFor, setApprovalFor] = useState<{ reason: string; payments: PaymentInput[] } | null>(null);
   const [clearAsk, setClearAsk] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -98,7 +98,7 @@ export function PosPage() {
       completeSale: openPay,
       newBill: () => (done ? newBill() : undefined),
     },
-    !payOpen && !done && override === null && !approvalFor,
+    !payOpen && !done && !override && !approvalFor,
   );
 
   // Look up an existing customer when a full phone number is typed.
@@ -150,7 +150,7 @@ export function PosPage() {
     }
   };
 
-  const dialogOpen = payOpen || override !== null || approvalFor !== null || clearAsk;
+  const dialogOpen = payOpen || override || approvalFor !== null || clearAsk;
 
   // Barcode scanner: add the scanned product wherever the cursor is. A scan after a completed sale starts the next bill.
   useBarcodeScanner((code) => {
@@ -178,7 +178,11 @@ export function PosPage() {
   }, [lastScan]);
 
   if (!settings || !totals) return null;
-  const overrideLine = lines.find((l) => l.key === override) ?? null;
+  // The discount is decided for the whole bill, not per item: one percentage for every item that is normally discounted.
+  const eligible = lines.filter((l) => l.product.effectiveDiscountBp > 0);
+  const policyBps = [...new Set(eligible.map((l) => l.product.effectiveDiscountBp))];
+  const billPolicyBp = policyBps.length === 1 ? policyBps[0] : null;
+  const billOverridden = lines.some((l) => l.overrideBp !== null);
   const noItems = lines.length === 0;
 
   return (
@@ -230,12 +234,10 @@ export function PosPage() {
               <span className="w-[6.25rem] shrink-0 text-center">Qty</span>
               <span className="w-[4.5rem] shrink-0 text-right">Price</span>
               <span className="w-[5rem] shrink-0 text-right">Total</span>
-              <span className="w-[4.25rem] shrink-0 text-center">Disc.</span>
               <span className="w-4 shrink-0" />
             </div>
             {lines.map((l, i) => {
               const t = totals.lines[i];
-              const bp = lineDiscountBp(l);
               const over = l.qty > l.product.stockQty;
               return (
                 <div key={l.key} onClick={() => setSelected(l.key)} className={cn('flex items-center gap-2 border-b border-border/70 px-3 py-1.5', selected === l.key && 'bg-secondary/60')} data-testid="cart-line">
@@ -269,17 +271,7 @@ export function PosPage() {
                   <div className="num w-[4.5rem] shrink-0 text-right text-xs text-muted-foreground" title={l.product.unit}>
                     × {formatINR(l.product.pricePaise ?? 0)}
                   </div>
-                  <div className="num w-[5rem] shrink-0 text-right text-sm font-semibold" title={bp > 0 ? `${bpToPercent(bp)}% off, -${formatINR(t.discountPaise)}` : 'No discount'}>
-                    {formatINR(t.netPaise)}
-                  </div>
-                  <button
-                    className={cn('flex w-[4.25rem] shrink-0 items-center justify-center gap-0.5 rounded px-1 text-xs underline-offset-2 hover:underline', l.overrideBp !== null ? 'text-warning' : 'text-muted-foreground hover:text-foreground')}
-                    title="Change discount for this item"
-                    aria-label={`Change discount of ${l.product.nameEn}`}
-                    onClick={() => setOverride(l.key)}
-                  >
-                    <Percent className="h-3 w-3" /> {bp > 0 ? `${bpToPercent(bp)}%` : 'No disc.'}
-                  </button>
+                  <div className="num w-[5rem] shrink-0 text-right text-sm font-semibold">{formatINR(t.grossPaise)}</div>
                   <button className="shrink-0 text-muted-foreground hover:text-destructive" aria-label={`Remove ${l.product.nameEn}`} onClick={() => remove(l.key)}>
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -292,7 +284,17 @@ export function PosPage() {
 
         <div className="border-t border-border bg-muted/40 px-3 py-3">
           <Row label="Subtotal (list)" value={formatINR(totals.subtotalPaise)} />
-          <Row label="Discount" value={totals.discountPaise > 0 ? `−${formatINR(totals.discountPaise)}` : formatINR(0)} />
+          <Row
+            label="Discount (on total bill)"
+            value={totals.discountPaise > 0 ? `−${formatINR(totals.discountPaise)}` : formatINR(0)}
+            action={
+              eligible.length > 0 || billOverridden ? (
+                <button className={cn('flex items-center gap-0.5 text-xs underline-offset-2 hover:underline', billOverridden ? 'text-warning' : 'text-muted-foreground hover:text-foreground')} title="Change the discount for this whole bill" onClick={() => setOverride(true)} data-testid="change-discount">
+                  <Percent className="h-3 w-3" /> {billOverridden ? 'changed' : 'change'}
+                </button>
+              ) : null
+            }
+          />
           {settings['tax.enabled'] && totals.taxPaise >= 0 && settings['tax.rate_bp'] > 0 && <Row label={`${settings['tax.label']} ${bpToPercent(settings['tax.rate_bp'])}%${settings['tax.inclusive'] ? ' (included)' : ''}`} value={formatINR(totals.taxPaise)} />}
           <div className="mt-1 flex items-baseline justify-between border-t border-border pt-2">
             <span className="text-sm font-medium">Payable</span>
@@ -308,9 +310,11 @@ export function PosPage() {
       </div>
 
       <OverrideDialog
-        line={overrideLine}
-        onClose={() => setOverride(null)}
-        onApply={(bp, reason) => setLines((ls) => ls.map((l) => (l.key === override ? { ...l, overrideBp: bp, overrideReason: reason } : l)))}
+        open={override}
+        policyBp={billPolicyBp}
+        overridden={billOverridden}
+        onClose={() => setOverride(false)}
+        onApply={(bp, reason) => setLines((ls) => ls.map((l) => (l.product.effectiveDiscountBp > 0 ? { ...l, overrideBp: bp, overrideReason: bp === null ? '' : reason } : l)))}
       />
       <PaymentDialog open={payOpen} onOpenChange={setPayOpen} lines={lines} totals={totals} customer={customer} busy={busy} error={payError} onComplete={(p) => void complete(p)} />
       <ApprovalDialog
@@ -348,10 +352,13 @@ export function PosPage() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) {
   return (
     <div className="flex justify-between py-0.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-2 text-muted-foreground">
+        {label}
+        {action}
+      </span>
       <span className="num">{value}</span>
     </div>
   );

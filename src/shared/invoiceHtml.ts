@@ -110,7 +110,7 @@ hr{border:0;border-top:1px dashed #000;margin:4px 0}
 function totalsRows(inv: PrintableInvoice, shop: PrintableShop, cls: 'a4' | 'thermal'): string {
   const rows: [string, string, string?][] = [];
   rows.push(['Subtotal', formatINR(inv.subtotalPaise)]);
-  if (inv.discountPaise > 0) rows.push(['Discount', `-${formatINR(inv.discountPaise)}`]);
+  if (inv.discountPaise > 0) rows.push(['Discount on total bill', `-${formatINR(inv.discountPaise)}`]);
   if (inv.taxEnabled && inv.taxRateBp > 0) {
     rows.push([`${shop.taxLabel} ${bpToPercent(inv.taxRateBp)}%${inv.taxInclusive ? ' (incl.)' : ''}`, formatINR(inv.taxPaise)]);
   }
@@ -149,25 +149,25 @@ export function renderInvoiceHtml(inv: PrintableInvoice, shop: PrintableShop, op
   if (size === 'a4') {
     const rows = inv.lines
       .map(
-        (l, i) => `<tr><td>${i + 1}</td><td><div>${esc(l.nameEn)}</div>${ta(l.nameTa)}</td><td class="num">${l.qty} ${esc(l.unit)}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${l.discountPaise ? `${formatAmount(l.discountPaise)} (${bpToPercent(l.discountBp)}%)` : '-'}</td><td class="num">${formatAmount(l.netPaise)}</td></tr>`,
+        (l, i) => `<tr><td>${i + 1}</td><td><div>${esc(l.nameEn)}</div>${ta(l.nameTa)}</td><td class="num">${l.qty} ${esc(l.unit)}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${formatAmount(l.netPaise + l.discountPaise)}</td></tr>`,
       )
       .join('');
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNo)}</title>${head}</head><body><div class="doc">
 <header>${shop.logoDataUrl ? `<img src="${esc(shop.logoDataUrl)}" alt="">` : ''}<div><h1>${esc(shop.nameEn)}</h1>${shop.showTamil ? `<h2 class="ta">${esc(shop.nameTa)}</h2>` : ''}<div>${esc(shop.address)}</div>${shop.showTamil && shop.addressTa ? `<div class="ta">${esc(shop.addressTa)}</div>` : ''}<div>${phones ? `Phone: ${esc(phones)}` : ''}${shop.taxId ? ` &nbsp; ${esc(shop.taxLabel)} No: ${esc(shop.taxId)}` : ''}</div></div></header>
 ${banners}
 <div class="meta"><div><strong>Invoice:</strong> ${esc(inv.invoiceNo)}<br><strong>Date:</strong> ${esc(fmtDateTime(inv.createdAt))}</div><div><strong>Cashier:</strong> ${esc(inv.cashierName)}${customer ? `<br><strong>Customer:</strong> ${customer}` : ''}</div></div>
-<table><thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Rate (₹)</th><th class="r">Discount (₹)</th><th class="r">Amount (₹)</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Rate (₹)</th><th class="r">Amount (₹)</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="totals">${totalsRows(inv, shop, 'a4')}</div>
 <div class="foot">${esc(shop.footerEn)}${shop.showTamil && shop.footerTa ? `<div class="ta">${esc(shop.footerTa)}</div>` : ''}</div>
 </div>${script}</body></html>`;
   }
 
-  // One line per product: item, qty, price, total (the net amount for that product). A long name wraps inside its own
-  // column; the numbers stay on the first line. Any discount is shown in the totals below.
+  // One line per product: item, qty, price, total (qty x price, before discount). A long name wraps inside its own
+  // column; the numbers stay on the first line. Line totals are before discount: the discount is given once, on the total bill (see the totals below).
   const showUnit = size !== '58mm';
   const items = `<table class="items"><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>${inv.lines
     .map(
-      (l) => `<tr><td class="n">${esc(l.nameEn)}${ta(l.nameTa)}</td><td class="num">${l.qty}${showUnit ? ` ${esc(l.unit)}` : ''}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${formatAmount(l.netPaise)}</td></tr>`,
+      (l) => `<tr><td class="n">${esc(l.nameEn)}${ta(l.nameTa)}</td><td class="num">${l.qty}${showUnit ? ` ${esc(l.unit)}` : ''}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${formatAmount(l.netPaise + l.discountPaise)}</td></tr>`,
     )
     .join('')}</tbody></table>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNo)}</title>${head}</head><body>

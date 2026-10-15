@@ -193,7 +193,12 @@ try {
     assert.equal(await lines.count(), 3);
     // 65 + 2*150 + 450 = 815.00 ; discount 6.50 + 30.00 = 36.50 ; payable 778.50
     assert.equal(money(await page.getByTestId('cart-total').innerText()), 778.5);
-    await page.getByText('No disc.', { exact: false }).first().waitFor();
+    // the discount is given once, on the total bill: cart rows show list amounts only (65.00, 300.00, 450.00)
+    await page.getByText('Discount (on total bill)').waitFor();
+    await page.getByTestId('change-discount').waitFor();
+    const rowsText = await lines.allInnerTexts();
+    assert.ok(rowsText.every((t) => !/%/.test(t)), 'no per-item discount shown in the cart rows');
+    assert.ok(/65\.00/.test(rowsText[0]) && /300\.00/.test(rowsText[1]) && /450\.00/.test(rowsText[2]), 'cart rows show list amounts');
     await shot(page, '05-pos-cart');
     await page.keyboard.press('F8');
     await page.getByTestId('payable').waitFor();
@@ -228,6 +233,7 @@ try {
       assert.match(text, /SKP-000001/);
       assert.match(text, /Shree Krishna Pattasu Kadai/);
       assert.doesNotMatch(text, /[\u0B80-\u0BFF]/, 'bills are English only - no Tamil expected');
+      assert.match(text, /Discount on total bill/);
       assert.match(text, /778\.50/);
       assert.match(text, /Classic Bomb/);
       assert.doesNotMatch(text, /DUPLICATE COPY/, 'first print must not be marked as a duplicate');

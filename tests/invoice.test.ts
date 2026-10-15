@@ -30,6 +30,19 @@ describe('invoice rendering', () => {
     }
   });
 
+  it('lists items at list price and gives the discount once, on the total bill', async () => {
+    const { app, inv } = await oneBill();
+    for (const size of ['58mm', '80mm', 'a4'] as const) {
+      const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: '.' });
+      expect(html).toContain('Discount on total bill');
+      expect(html).not.toMatch(/<th[^>]*>Discount/); // no per-item discount column
+      const rows = html.match(/<tr><td[^>]*>.*?<\/tr>/g) ?? [];
+      expect(rows.join('')).toContain('300.00'); // 2 x 150.00 before discount
+      expect(rows.join('')).not.toContain('270.00'); // net only appears in the totals
+      expect(html).toContain('₹270.00');
+    }
+  });
+
   it('can optionally add Tamil, marks cancelled bills, drafts and test pages', async () => {
     const { app, inv } = await oneBill();
     const shop = { ...shopForPrint(app.rt), showTamil: true };
