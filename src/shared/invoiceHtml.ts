@@ -86,7 +86,7 @@ tr{break-inside:avoid}
 .totals{margin-left:auto;margin-top:10px;width:260px}
 .totals div{display:flex;justify-content:space-between;padding:2px 0}
 .totals .grand{font-weight:700;font-size:15px;border-top:2px solid #155D43;margin-top:4px;padding-top:6px}
-.totals .qty{font-weight:700;font-size:14px;margin-top:4px}
+.tq{margin-bottom:4px;font-weight:700;font-size:14px;color:#000}
 .addr{white-space:pre-line}
 .foot{margin-top:18px;text-align:center;color:#444;font-size:11px;border-top:1px solid #ccc;padding-top:8px}
 .greet{margin-top:4px;font-size:14px;font-weight:700;color:#155D43;font-family:'Inter','Noto Color Emoji','Segoe UI Emoji','Apple Color Emoji',sans-serif}`
@@ -99,15 +99,17 @@ h2{font-size:${size === '58mm' ? '11px' : '12px'};margin:0;text-align:center;fon
 .logo{display:block;margin:0 auto 3px;max-height:44px;max-width:60%}
 hr{border:0;border-top:1px dashed #000;margin:4px 0}
 .row{display:flex;justify-content:space-between;gap:6px}
-.items{width:100%;border-collapse:collapse}
-.items th{font-weight:600;padding:1px 0;border-bottom:1px solid #000;text-align:left}
-.items th.r{text-align:right}
-.items td{padding:2px 0 2px 3px;vertical-align:top;border-bottom:1px dotted #999}
-.items td:first-child,.items th:first-child{padding-left:0}
+.hdr{flex-wrap:wrap}
+.hdr span{white-space:nowrap}
+.items{width:100%;border-collapse:collapse;table-layout:fixed}
+.items th{font-weight:600;padding:2px 0 2px 4px;border-bottom:1px solid #000;text-align:right}
+.items td{font-size:${size === '58mm' ? '9.5px' : 'inherit'};padding:3px 0 3px 4px;vertical-align:top;border-bottom:1px dotted #999;text-align:right;white-space:nowrap}
+.items th:first-child,.items td:first-child{padding-left:0;text-align:left}
+.items th.q,.items td.q{text-align:center}
 .items tr{break-inside:avoid}
-.items .n{font-weight:600;width:100%;word-break:break-word}
+.items td.n{font-weight:600;white-space:normal;word-break:break-word}
+.tq{margin:2px 0 3px;font-weight:700;font-size:${size === '58mm' ? '12px' : '14px'}}
 .totals .row{padding:1px 0}
-.totals .qty{font-weight:700;font-size:${size === '58mm' ? '12px' : '14px'};border-top:1px dashed #000;margin-top:3px;padding-top:2px}
 .totals .grand{font-weight:700;font-size:${size === '58mm' ? '12px' : '14px'};border-top:1px solid #000;border-bottom:1px solid #000;margin:3px 0;padding:2px 0}
 .foot{margin-top:4px;text-align:center;font-size:${size === '58mm' ? '9px' : '10px'}}
 .greet{margin-top:3px;font-size:${size === '58mm' ? '12px' : '14px'};font-weight:700;font-family:'Inter','Noto Color Emoji','Segoe UI Emoji','Apple Color Emoji',sans-serif}`
@@ -115,15 +117,19 @@ hr{border:0;border-top:1px dashed #000;margin:4px 0}
 @media screen{body{background:#fff}}
 `;
 
+/** "10%" - or "5% / 10%" when the bill mixes rates; only items that actually got a discount count. */
+export function discountPercentLabel(bps: number[]): string {
+  const distinct = [...new Set(bps.filter((b) => b > 0))].sort((a, b) => a - b);
+  return distinct.map((b) => `${bpToPercent(b)}%`).join(' / ');
+}
+
 function totalsRows(inv: PrintableInvoice, shop: PrintableShop, cls: 'a4' | 'thermal'): string {
   const rows: [string, string, string?][] = [];
   rows.push(['Subtotal', formatINR(inv.subtotalPaise)]);
-  if (inv.discountPaise > 0) rows.push(['Discount on total bill', `-${formatINR(inv.discountPaise)}`]);
+  if (inv.discountPaise > 0) rows.push([`Discount (${discountPercentLabel(inv.lines.map((l) => l.discountBp))})`, `-${formatINR(inv.discountPaise)}`]);
   if (inv.taxEnabled && inv.taxRateBp > 0) {
     rows.push([`${shop.taxLabel} ${bpToPercent(inv.taxRateBp)}%${inv.taxInclusive ? ' (incl.)' : ''}`, formatINR(inv.taxPaise)]);
   }
-  const totalQty = inv.lines.reduce((a, l) => a + l.qty, 0);
-  rows.push(['Total qty', String(totalQty), 'qty']);
   rows.push(['Net payable', formatINR(inv.totalPaise), 'grand']);
   const row = (l: string, v: string, c?: string) => (cls === 'a4' ? `<div class="${c ?? ''}"><span>${esc(l)}</span><span class="num">${esc(v)}</span></div>` : `<div class="row ${c ?? ''}"><span>${esc(l)}</span><span class="num">${esc(v)}</span></div>`);
   let out = rows.map(([l, v, c]) => row(l, v, c)).join('');
@@ -152,6 +158,8 @@ export function renderInvoiceHtml(inv: PrintableInvoice, shop: PrintableShop, op
     (inv.status === 'cancelled' ? `<div class="cancelled">CANCELLED${inv.cancelReason ? ` - ${esc(inv.cancelReason)}` : ''}</div>` : '') +
     (inv.reprint && !inv.sample ? '<div class="c" style="font-size:.85em">DUPLICATE COPY</div>' : '');
   const phones = shop.phones.filter(Boolean).join(', ');
+  const totalQty = inv.lines.reduce((a, l) => a + l.qty, 0);
+  const qtyLine = `<div class="tq">Total qty: ${totalQty}</div>`;
   const greeting = shop.greeting ? `<div class="greet">${esc(shop.greeting)}</div>` : '';
   const customer = inv.customerName || inv.customerPhone ? `${esc(inv.customerName ?? '')}${inv.customerPhone ? ` ${esc(inv.customerPhone)}` : ''}` : '';
   const head = `<link rel="stylesheet" href="${esc(opts.fontBase)}/fonts.css"><style>${CSS(size)}</style>`;
@@ -160,25 +168,25 @@ export function renderInvoiceHtml(inv: PrintableInvoice, shop: PrintableShop, op
   if (size === 'a4') {
     const rows = inv.lines
       .map(
-        (l, i) => `<tr><td>${i + 1}</td><td><div>${esc(l.nameEn)}</div>${ta(l.nameTa)}</td><td class="num">${l.qty} ${esc(l.unit)}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${formatAmount(l.netPaise + l.discountPaise)}</td></tr>`,
+        (l, i) => `<tr><td>${i + 1}</td><td><div>${esc(l.nameEn)}</div>${ta(l.nameTa)}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${l.qty} ${esc(l.unit)}</td><td class="num">${formatAmount(l.netPaise + l.discountPaise)}</td></tr>`,
       )
       .join('');
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNo)}</title>${head}</head><body><div class="doc">
 <header>${shop.logoDataUrl ? `<img src="${esc(shop.logoDataUrl)}" alt="">` : ''}<div><h1>${esc(shop.nameEn)}</h1>${shop.showTamil ? `<h2 class="ta">${esc(shop.nameTa)}</h2>` : ''}<div class="addr">${esc(shop.address)}</div>${shop.showTamil && shop.addressTa ? `<div class="ta">${esc(shop.addressTa)}</div>` : ''}<div>${phones ? `Phone: ${esc(phones)}` : ''}${shop.taxId ? ` &nbsp; ${esc(shop.taxLabel)} No: ${esc(shop.taxId)}` : ''}</div></div></header>
 ${banners}
 <div class="meta"><div><strong>Invoice:</strong> ${esc(inv.invoiceNo)}<br><strong>Date:</strong> ${esc(fmtDateTime(inv.createdAt))}</div><div><strong>Cashier:</strong> ${esc(inv.cashierName)}${customer ? `<br><strong>Customer:</strong> ${customer}` : ''}</div></div>
-<table><thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Rate (₹)</th><th class="r">Amount (₹)</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>#</th><th>Item</th><th class="r">Price (₹)</th><th class="r">Qty</th><th class="r">Total (₹)</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="totals">${totalsRows(inv, shop, 'a4')}</div>
-<div class="foot">${esc(shop.footerEn)}${shop.showTamil && shop.footerTa ? `<div class="ta">${esc(shop.footerTa)}</div>` : ''}${greeting}</div>
+<div class="foot">${qtyLine}${esc(shop.footerEn)}${shop.showTamil && shop.footerTa ? `<div class="ta">${esc(shop.footerTa)}</div>` : ''}${greeting}</div>
 </div>${script}</body></html>`;
   }
 
-  // One line per product: item, qty, price, total (qty x price, before discount). A long name wraps inside its own
-  // column; the numbers stay on the first line. Line totals are before discount: the discount is given once, on the total bill (see the totals below).
-  const showUnit = size !== '58mm';
-  const items = `<table class="items"><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>${inv.lines
+  // One line per product: item, price, qty, total (price x qty, before discount), in fixed-width columns so the numbers
+  // never run into each other. A long name wraps inside its own column. The discount is given once, on the total bill.
+  const cols = size === '58mm' ? [30, 26, 9, 35] : [38, 22, 12, 28];
+  const items = `<table class="items"><colgroup>${cols.map((w) => `<col style="width:${w}%">`).join('')}</colgroup><thead><tr><th>Item</th><th>Price</th><th class="q">Qty</th><th>Total</th></tr></thead><tbody>${inv.lines
     .map(
-      (l) => `<tr><td class="n">${esc(l.nameEn)}${ta(l.nameTa)}</td><td class="num">${l.qty}${showUnit ? ` ${esc(l.unit)}` : ''}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="num">${formatAmount(l.netPaise + l.discountPaise)}</td></tr>`,
+      (l) => `<tr><td class="n">${esc(l.nameEn)}${ta(l.nameTa)}</td><td class="num">${formatAmount(l.ratePaise)}</td><td class="q">${l.qty}</td><td class="num">${formatAmount(l.netPaise + l.discountPaise)}</td></tr>`,
     )
     .join('')}</tbody></table>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNo)}</title>${head}</head><body>
@@ -187,11 +195,11 @@ ${shop.logoDataUrl ? `<img class="logo" src="${esc(shop.logoDataUrl)}" alt="">` 
 <div class="c addr">${esc(shop.address)}</div>${shop.showTamil && shop.addressTa ? `<div class="c ta">${esc(shop.addressTa)}</div>` : ''}
 <div class="c">${phones ? `Ph: ${esc(phones)}` : ''}</div>${shop.taxId ? `<div class="c">${esc(shop.taxLabel)} No: ${esc(shop.taxId)}</div>` : ''}
 <hr>${banners}
-<div class="row"><span>Bill: <b>${esc(inv.invoiceNo)}</b></span><span>${esc(fmtDateTime(inv.createdAt))}</span></div>
+<div class="row hdr"><span>Bill: <b>${esc(inv.invoiceNo)}</b></span><span>${esc(fmtDateTime(inv.createdAt))}</span></div>
 <div class="row"><span>Cashier: ${esc(inv.cashierName)}</span></div>${customer ? `<div>Customer: ${customer}</div>` : ''}
 <hr>${items}<hr>
 <div class="totals">${totalsRows(inv, shop, 'thermal')}</div>
-<hr><div class="foot">${esc(shop.footerEn)}${shop.showTamil && shop.footerTa ? `<div class="ta">${esc(shop.footerTa)}</div>` : ''}${greeting}</div>${script}</body></html>`;
+<hr><div class="foot">${qtyLine}${esc(shop.footerEn)}${shop.showTamil && shop.footerTa ? `<div class="ta">${esc(shop.footerTa)}</div>` : ''}${greeting}</div>${script}</body></html>`;
 }
 
 /** Fabricated bill used only by "Print test page" in Settings. Clearly labelled as SAMPLE. */

@@ -13,10 +13,11 @@ import { ConfirmDialog } from '@/components/ui/dialog';
 import { ApprovalDialog } from '@/components/ApprovalDialog';
 import { cn, newRequestId } from '@/lib/utils';
 import { formatINR, bpToPercent } from '@shared/money';
+import { discountPercentLabel } from '@shared/invoiceHtml';
 import type { PaymentInput } from '@shared/pricing';
 import type { Approval, CustomerDTO, InvoiceDTO, ProductDTO } from '@/lib/types';
 import { ProductPicker, type PickerHandle } from './ProductPicker';
-import { cartTotals, type CartLine, type CustomerInput } from './cart';
+import { cartTotals, lineDiscountBp, type CartLine, type CustomerInput } from './cart';
 import { OverrideDialog } from './OverrideDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { SaleDoneDialog } from './SaleDoneDialog';
@@ -182,6 +183,7 @@ export function PosPage() {
   const eligible = lines.filter((l) => l.product.effectiveDiscountBp > 0);
   const policyBps = [...new Set(eligible.map((l) => l.product.effectiveDiscountBp))];
   const billPolicyBp = policyBps.length === 1 ? policyBps[0] : null;
+  const discountPct = discountPercentLabel(lines.map((l) => lineDiscountBp(l)));
   const billOverridden = lines.some((l) => l.overrideBp !== null);
   const noItems = lines.length === 0;
 
@@ -285,7 +287,7 @@ export function PosPage() {
         <div className="border-t border-border bg-muted/40 px-3 py-3">
           <Row label="Subtotal (list)" value={formatINR(totals.subtotalPaise)} />
           <Row
-            label="Discount (on total bill)"
+            label={`Discount${discountPct ? ` (${discountPct})` : ''}`}
             value={totals.discountPaise > 0 ? `−${formatINR(totals.discountPaise)}` : formatINR(0)}
             action={
               eligible.length > 0 || billOverridden ? (

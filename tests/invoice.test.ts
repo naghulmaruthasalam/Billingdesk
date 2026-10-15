@@ -21,7 +21,7 @@ describe('invoice rendering', () => {
     const { app, inv } = await oneBill();
     for (const size of ['58mm', '80mm', 'a4'] as const) {
       const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: './fonts' });
-      expect(html).toContain('Shree Krishna Pattasu Kadai');
+      expect(html).toContain('Shree Krishna Crackers Shop');
       expect(html).toContain('Classic Bomb');
       expect(html).not.toContain('ஸ்ரீ கிருஷ்ணா பட்டாசு கடை');
       expect(html).not.toContain('கிளாசிக் பாம்');
@@ -36,7 +36,7 @@ describe('invoice rendering', () => {
     const { app, inv } = await oneBill();
     for (const size of ['58mm', '80mm', 'a4'] as const) {
       const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: '.' });
-      expect(html).toContain('Discount on total bill');
+      expect(html).toContain('Discount (10%)'); // the rate, beside the amount
       expect(html).not.toMatch(/<th[^>]*>Discount/); // no per-item discount column
       const rows = html.match(/<tr><td[^>]*>.*?<\/tr>/g) ?? [];
       expect(rows.join('')).toContain('300.00'); // 2 x 150.00 before discount
@@ -45,12 +45,27 @@ describe('invoice rendering', () => {
     }
   });
 
+  it('lays the item rows out as item, price, qty, total in fixed columns', async () => {
+    const { app, inv } = await oneBill();
+    for (const size of ['58mm', '80mm'] as const) {
+      const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: '.' });
+      expect(html).toMatch(/<th>Item<\/th><th>Price<\/th><th class="q">Qty<\/th><th>Total<\/th>/);
+      expect(html).toContain('table-layout:fixed');
+      const row = html.match(/<tr><td class="n">.*?<\/tr>/)![0];
+      expect(row.indexOf('150.00')).toBeLessThan(row.indexOf('>2<')); // price before qty
+      expect(row.indexOf('>2<')).toBeLessThan(row.indexOf('300.00')); // qty before total
+    }
+    const a4 = renderInvoiceHtml(inv, shopForPrint(app.rt), { size: 'a4', fontBase: '.' });
+    expect(a4).toMatch(/<th>Item<\/th><th class="r">Price[^<]*<\/th><th class="r">Qty<\/th><th class="r">Total/);
+  });
+
   it('shows the total quantity beside the total, the no-return tagline and the greeting', async () => {
     const { app, inv } = await oneBill();
     for (const size of ['58mm', '80mm', 'a4'] as const) {
       const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: '.' });
-      expect(html).toMatch(/Total qty<\/span><span class="num">2<\/span>/); // 2 x Classic Bomb
-      expect(html.indexOf('Total qty')).toBeLessThan(html.indexOf('Net payable'));
+      expect(html).toContain('Total qty: 2'); // 2 x Classic Bomb
+      expect(html.indexOf('Net payable')).toBeLessThan(html.indexOf('Total qty'));
+      expect(html.indexOf('Total qty')).toBeLessThan(html.indexOf('Goods once sold')); // directly above the tagline
       expect(html).toContain('Goods once sold cannot be taken back.');
       expect(html).toContain('Happy Diwali 🎆');
       expect(html.lastIndexOf('Happy Diwali')).toBeGreaterThan(html.indexOf('Goods once sold'));

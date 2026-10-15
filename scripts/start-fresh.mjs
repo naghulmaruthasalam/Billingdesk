@@ -7,7 +7,7 @@
 //
 // Nothing is deleted: the whole data folder (database, backups, logs) is MOVED to "<folder>.old-<timestamp>" so it can be
 // moved back if this was a mistake. The next launch shows the first-time setup screen (create the owner account, confirm the
-// address, approve the catalogue) and seeds the shop name "Shree Krishna Pattasu Kadai".
+// address, approve the catalogue) and seeds the shop name "Shree Krishna Crackers Shop".
 // Close Sri Krishna Billing before running this. No dependencies: plain Node.js 18+.
 import { existsSync, renameSync } from 'node:fs';
 import { homedir, platform } from 'node:os';

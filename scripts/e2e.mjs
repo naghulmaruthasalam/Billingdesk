@@ -40,7 +40,7 @@ async function launch() {
   page.setDefaultTimeout(15000);
   page.on('pageerror', (e) => console.log('    [pageerror]', e.message));
   await page.setViewportSize({ width: 1366, height: 820 });
-  await page.waitForSelector('text=Shree Krishna Pattasu Kadai');
+  await page.waitForSelector('text=Shree Krishna Crackers Shop');
   return { app, page };
 }
 
@@ -194,7 +194,7 @@ try {
     // 65 + 2*150 + 450 = 815.00 ; discount 6.50 + 30.00 = 36.50 ; payable 778.50
     assert.equal(money(await page.getByTestId('cart-total').innerText()), 778.5);
     // the discount is given once, on the total bill: cart rows show list amounts only (65.00, 300.00, 450.00)
-    await page.getByText('Discount (on total bill)').waitFor();
+    await page.getByText('Discount (10%)').waitFor();
     await page.getByTestId('change-discount').waitFor();
     assert.equal((await page.getByTestId('cart-qty').innerText()).replace(/\D+/g, ''), '4', 'total quantity shown beside the total (1 + 2 + 1)');
     const rowsText = await lines.allInnerTexts();
@@ -232,10 +232,11 @@ try {
       const text = readFileSync(txt, 'utf8').normalize('NFC');
       console.log(`    pdftotext excerpt: ${JSON.stringify(text.slice(0, 160))}`);
       assert.match(text, /SKP-000001/);
-      assert.match(text, /Shree Krishna Pattasu Kadai/);
+      assert.match(text, /Shree Krishna Crackers Shop/);
       assert.doesNotMatch(text, /[\u0B80-\u0BFF]/, 'bills are English only - no Tamil expected');
-      assert.match(text, /Discount on total bill/);
-      assert.match(text, /Total qty\s+\d+/);
+      assert.match(text, /Discount \(10%\)/);
+      assert.match(text, /Total qty: 4/);
+      assert.match(text, /Item\s+Price\s+Qty\s+Total/, 'column order: item, price, qty, total');
       assert.match(text, /Goods once sold cannot be taken back/);
       assert.match(text, /Happy Diwali/);
       assert.doesNotMatch(text, /Kovaipudur/);
