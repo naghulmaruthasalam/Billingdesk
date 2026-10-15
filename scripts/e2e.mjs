@@ -208,7 +208,7 @@ try {
     await shot(page, '07-sale-done');
   });
 
-  await step('print: Save as PDF through the print workflow, Tamil text verified in the PDF', async () => {
+  await step('print: Save as PDF through the print workflow, English-only bill verified in the PDF', async () => {
     const pdf = join(out, 'invoice-reprint.pdf');
     rmSync(pdf, { force: true });
     await app.evaluate(({ dialog }, p) => {
@@ -227,12 +227,11 @@ try {
       console.log(`    pdftotext excerpt: ${JSON.stringify(text.slice(0, 160))}`);
       assert.match(text, /SKP-000001/);
       assert.match(text, /Shree Krishna Pattasu Kadai/);
-      assert.match(text, /ஸ்ரீ கிருஷ்ணா பட்டாசு கடை/, 'Tamil shop name missing from PDF text');
+      assert.doesNotMatch(text, /[\u0B80-\u0BFF]/, 'bills are English only - no Tamil expected');
       assert.match(text, /778\.50/);
-      assert.match(text, /கிளாசிக் பாம்/);
       assert.match(text, /Classic Bomb/);
       assert.doesNotMatch(text, /DUPLICATE COPY/, 'first print must not be marked as a duplicate');
-      if (hasTool('pdffonts')) assert.match(execFileSync('pdffonts', [pdf], { encoding: 'utf8' }), /Noto/i);
+      if (hasTool('pdffonts')) assert.match(execFileSync('pdffonts', [pdf], { encoding: 'utf8' }), /Inter|Noto/i);
       if (hasTool('pdftoppm')) execFileSync('pdftoppm', ['-png', '-r', '110', '-singlefile', pdf, join(out, 'invoice-reprint')]);
     } else console.log('    (poppler-utils not installed: PDF text/font checks skipped)');
     await page.getByRole('button', { name: 'Preview / reprint' }).click();

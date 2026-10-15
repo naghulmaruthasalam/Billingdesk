@@ -127,7 +127,7 @@ export function PrintersTab() {
             {options(label)}
           </Select>
         </Field>
-        <Field label="How receipts are sent" hint={settings['printing.receipt_method'] === 'escpos' ? 'The receipt is drawn as a picture and sent in ESC/POS commands. Works without a driver and prints Tamil.' : 'Normal printing through the printer driver.'}>
+        <Field label="How receipts are sent" hint={settings['printing.receipt_method'] === 'escpos' ? 'The receipt is drawn as a picture and sent in ESC/POS commands. Works without a driver.' : 'Normal printing through the printer driver.'}>
           <Select value={settings['printing.receipt_method']} disabled={!manage} onChange={(e) => void save({ 'printing.receipt_method': e.target.value })} aria-label="How receipts are sent">
             <option value="driver">Printer driver (normal printers, A4)</option>
             <option value="escpos">Thermal receipt printer - ESC/POS (Linux, no driver needed)</option>

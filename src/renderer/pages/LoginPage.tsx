@@ -44,7 +44,6 @@ export function LoginPage() {
           </div>
           <div>
             <div className="text-base font-semibold leading-tight">Shree Krishna Pattasu Kadai</div>
-            <div className="ta text-sm text-muted-foreground">ஸ்ரீ கிருஷ்ணா பட்டாசு கடை</div>
           </div>
         </div>
         <h1 className="mb-1 text-lg font-semibold">{needsSetup ? 'First-time setup' : 'Sign in'}</h1>

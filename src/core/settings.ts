@@ -85,7 +85,7 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'invoice.prefix': 'SKP',
   'invoice.pad': 6,
   'invoice.receipt_size': '80mm',
-  'invoice.show_tamil': true,
+  'invoice.show_tamil': false,
   'setup.address_confirmed': false,
   'setup.catalogue_approved': false,
   'discount.default_bp': 1000,

@@ -139,7 +139,7 @@ export function SettingsPage() {
             <Field label="Invoice prefix" hint="Letters, digits, hyphen. Example: SKP → SKP-000123"><Input value={d['invoice.prefix']} onChange={(e) => set('invoice.prefix', e.target.value)} /></Field>
             <Field label="Number length (digits)"><Input type="number" min={1} max={10} value={d['invoice.pad']} onChange={(e) => set('invoice.pad', Math.max(1, Math.min(10, Number(e.target.value) || 6)))} /></Field>
             <Field label="Default receipt size"><Select value={d['invoice.receipt_size']} onChange={(e) => set('invoice.receipt_size', e.target.value as AllSettings['invoice.receipt_size'])}><option value="58mm">58 mm thermal</option><option value="80mm">80 mm thermal</option><option value="a4">A4 invoice</option></Select></Field>
-            <div className="flex items-end"><CheckRow checked={d['invoice.show_tamil']} onChange={(v) => set('invoice.show_tamil', v)} label="Print Tamil names and shop name" /></div>
+            <div className="flex items-end"><CheckRow checked={d['invoice.show_tamil']} onChange={(v) => set('invoice.show_tamil', v)} label="Also print Tamil names (optional - bills are English by default)" /></div>
             <Field label="Footer line (English)"><Input value={d['invoice.footer_en']} onChange={(e) => set('invoice.footer_en', e.target.value)} /></Field>
             <Field label="Footer line (Tamil)"><Input className="ta" value={d['invoice.footer_ta']} onChange={(e) => set('invoice.footer_ta', e.target.value)} /></Field>
             <div className="col-span-2 flex flex-wrap items-center gap-2">

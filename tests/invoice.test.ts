@@ -15,25 +15,25 @@ describe('invoice rendering', () => {
     expect(esc('<script>alert(1)</script>')).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
   });
 
-  it('prints English and Tamil shop and item names, totals and ₹ amounts on every paper size', async () => {
+  it('prints English-only shop and item names, totals and ₹ amounts on every paper size by default', async () => {
     const { app, inv } = await oneBill();
     for (const size of ['58mm', '80mm', 'a4'] as const) {
       const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: './fonts' });
       expect(html).toContain('Shree Krishna Pattasu Kadai');
-      expect(html).toContain('ஸ்ரீ கிருஷ்ணா பட்டாசு கடை');
-      expect(html).toContain('கிளாசிக் பாம்');
+      expect(html).toContain('Classic Bomb');
+      expect(html).not.toContain('ஸ்ரீ கிருஷ்ணா பட்டாசு கடை');
+      expect(html).not.toContain('கிளாசிக் பாம்');
       expect(html).toContain(inv.invoiceNo);
       expect(html).toContain('₹270.00'); // net payable 2 x 150 less 10%
-      expect(html).toContain('Noto Sans Tamil');
       expect(html).toContain('./fonts/fonts.css');
       expect(html).toMatch(size === 'a4' ? /@page\{size:A4/ : new RegExp(`@page\\{size:${size} auto`));
     }
   });
 
-  it('can hide Tamil, marks cancelled bills, drafts and test pages', async () => {
+  it('can optionally add Tamil, marks cancelled bills, drafts and test pages', async () => {
     const { app, inv } = await oneBill();
-    const shop = { ...shopForPrint(app.rt), showTamil: false };
-    expect(renderInvoiceHtml(inv, shop, { size: '80mm', fontBase: '.' })).not.toContain('கிளாசிக் பாம்');
+    const shop = { ...shopForPrint(app.rt), showTamil: true };
+    expect(renderInvoiceHtml(inv, shop, { size: '80mm', fontBase: '.' })).toContain('கிளாசிக் பாம்');
     expect(renderInvoiceHtml({ ...inv, status: 'cancelled', cancelReason: 'x' }, shopForPrint(app.rt), { size: '80mm', fontBase: '.' })).toContain('CANCELLED');
     expect(renderInvoiceHtml({ ...inv, draft: true }, shopForPrint(app.rt), { size: '80mm', fontBase: '.' })).toContain('DRAFT PREVIEW');
     expect(renderInvoiceHtml(sampleInvoice(), shopForPrint(app.rt), { size: '80mm', fontBase: '.' })).toContain('SAMPLE - TEST PRINT');

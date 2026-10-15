@@ -124,12 +124,12 @@ describe('upgrading a database that predates barcodes', () => {
 describe('barcode labels', () => {
   const item = (n: number, barcode: string | null = '2000000000015') => ({ sku: `SK-${n}`, nameEn: `Item ${n}`, nameTa: 'கிளாசிக் பாம்', unit: 'Box', pricePaise: 15000, barcode });
 
-  it('renders one page per thermal label with name, Tamil name, price and bars', () => {
+  it('renders one page per thermal label with name, price and bars (English only by default)', () => {
     const r = renderLabelsHtml([item(1), item(2), item(2)], 'Shree Krishna Pattasu Kadai', DEFAULT_LABEL_LAYOUT, { fontBase: './fonts' });
     expect(r.labels).toBe(3);
     expect(r.pages).toBe(3);
     expect(r.html).toContain('@page{size:50mm 30mm;margin:0}');
-    expect(r.html).toContain('கிளாசிக் பாம்');
+    expect(r.html).not.toContain('கிளாசிக் பாம்');
     expect(r.html).toContain('₹150.00');
     expect(r.html).toContain('aria-label="Barcode 2000000000015"');
     expect(r.html).toContain('Shree Krishna Pattasu Kadai');
@@ -171,11 +171,11 @@ describe('barcode labels', () => {
     expect(r.labels).toBe(3);
     expect(r.html).toContain(a.barcode);
     expect(r.html).toContain(b.barcode);
-    await app.call('settings:update', { patch: { 'labels.layout': { ...DEFAULT_LABEL_LAYOUT, kind: 'a4', cols: 4, rows: 10, showTamil: false } } });
+    await app.call('settings:update', { patch: { 'labels.layout': { ...DEFAULT_LABEL_LAYOUT, kind: 'a4', cols: 4, rows: 10, showTamil: true } } });
     const a4 = await app.call('labels:html', { items: [{ productId: a.id, copies: 50 }] });
     expect(a4.pages).toBe(2);
     expect(a4.geometry.perPage).toBe(40);
-    expect(a4.html).not.toContain('கிளாசிக்');
+    expect(a4.html).toContain('கிளாசிக்'); // opt-in Tamil still works
     await expectError(app.call('labels:html', { items: [{ productId: a.id, copies: 501 }] }), 'VALIDATION');
     await expectError(app.call('labels:html', { items: [{ productId: 99999, copies: 1 }] }), 'NOT_FOUND');
     await expectError(app.call('settings:update', { patch: { 'labels.layout': { ...DEFAULT_LABEL_LAYOUT, widthMm: 5 } } }), 'VALIDATION');

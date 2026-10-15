@@ -2,6 +2,8 @@
 
 Offline-first desktop billing, inventory and reporting for **Shree Krishna Pattasu Kadai** (ஸ்ரீ கிருஷ்ணா பட்டாசு கடை), Kovaipudur, Coimbatore.
 
+**Bills, receipts and labels are printed in English only.** Tamil names stay in the catalogue for searching and can be switched back on under *Settings → Invoices* ("Also print Tamil names") and in the label options.
+
 One codebase, one SQLite schema, two installers:
 
 | Platform | Package | Command |
@@ -136,7 +138,7 @@ Inside: `data/skbilling.sqlite` (WAL mode, `synchronous=FULL`), `backups/`, `log
 * **Label printing**: *Products → Barcode labels*. Pick products and copies (or *Copies = stock* after receiving goods), choose a label type, preview, then **Print** or **Save as PDF**.
   * Roll labels 50×30, 40×30, 60×40 mm or any custom size - one label per page at the exact size.
   * A4 sticker sheets (3×8, 4×10, 3×7 or custom columns/rows/margins) with **Start at label no.** to re-use a part-used sheet.
-  * Each label: shop name, English and Tamil name, price per unit, bars and digits. The preview shows the printed bar width and warns when it is too thin for reliable scanning (below 0.25 mm).
+  * Each label: shop name, English name (Tamil optional), price per unit, bars and digits. The preview shows the printed bar width and warns when it is too thin for reliable scanning (below 0.25 mm).
   * *Save as shop default* stores the layout for everyone.
   * A single label can also be printed from the product's edit dialog.
 * **Printers**: labels go through the operating system's print system, like receipts. Install the label printer's driver, set its paper to the same size as the label (margins zero) and choose the printer in the print window. Direct raw printer languages (ZPL/TSPL/ESC-POS) are not used.

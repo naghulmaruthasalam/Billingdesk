@@ -18,7 +18,7 @@ export interface LabelLayout {
 }
 
 /** 50 x 30 mm roll label is the most common size for 203-dpi thermal label printers. */
-export const DEFAULT_LABEL_LAYOUT: LabelLayout = { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, showPrice: true, showTamil: true, showShop: true };
+export const DEFAULT_LABEL_LAYOUT: LabelLayout = { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, showPrice: true, showTamil: false, showShop: true };
 
 export interface LabelItem {
   sku: string;
