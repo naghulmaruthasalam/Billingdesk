@@ -4,7 +4,7 @@
 # better-sqlite3 ships N-API prebuilt binaries for Windows and Linux, so no native rebuild step is needed.
 appId: in.srikrishna.billing
 productName: Sri Krishna Billing
-copyright: Sri Krishna Pattasu Kadai
+copyright: Shree Krishna Pattasu Kadai
 directories:
   output: release
   buildResources: resources
@@ -46,8 +46,8 @@ linux:
       arch: [x64]
   icon: resources/icon.png
   category: Office
-  maintainer: Sri Krishna Pattasu Kadai <noreply@example.invalid>
-  synopsis: Offline billing and inventory for Sri Krishna Pattasu Kadai
+  maintainer: Shree Krishna Pattasu Kadai <noreply@example.invalid>
+  synopsis: Offline billing and inventory for Shree Krishna Pattasu Kadai
   description: Offline-first point-of-sale, inventory and reporting application.
   desktop:
     entry:

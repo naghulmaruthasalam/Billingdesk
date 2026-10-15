@@ -40,7 +40,7 @@ async function launch() {
   page.setDefaultTimeout(15000);
   page.on('pageerror', (e) => console.log('    [pageerror]', e.message));
   await page.setViewportSize({ width: 1366, height: 820 });
-  await page.waitForSelector('text=Sri Krishna Pattasu Kadai');
+  await page.waitForSelector('text=Shree Krishna Pattasu Kadai');
   return { app, page };
 }
 
@@ -226,7 +226,7 @@ try {
       const text = readFileSync(txt, 'utf8').normalize('NFC');
       console.log(`    pdftotext excerpt: ${JSON.stringify(text.slice(0, 160))}`);
       assert.match(text, /SKP-000001/);
-      assert.match(text, /Sri Krishna Pattasu Kadai/);
+      assert.match(text, /Shree Krishna Pattasu Kadai/);
       assert.match(text, /ஸ்ரீ கிருஷ்ணா பட்டாசு கடை/, 'Tamil shop name missing from PDF text');
       assert.match(text, /778\.50/);
       assert.match(text, /கிளாசிக் பாம்/);

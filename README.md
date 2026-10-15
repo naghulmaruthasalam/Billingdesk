@@ -1,6 +1,6 @@
 # Sri Krishna Billing
 
-Offline-first desktop billing, inventory and reporting for **Sri Krishna Pattasu Kadai** (ஸ்ரீ கிருஷ்ணா பட்டாசு கடை), Kovaipudur, Coimbatore.
+Offline-first desktop billing, inventory and reporting for **Shree Krishna Pattasu Kadai** (ஸ்ரீ கிருஷ்ணா பட்டாசு கடை), Kovaipudur, Coimbatore.
 
 One codebase, one SQLite schema, two installers:
 
@@ -86,7 +86,7 @@ Key decisions:
 
 Real billing is deliberately locked until the owner has checked the transcribed data.
 
-1. **Create the owner account.** There is no default password. A one-time **recovery code** is shown; keep it safe. It resets the owner password without touching any data (*Sign in → Forgot the owner password?*). If the recovery code is lost too, `node scripts/reset-owner-password.mjs` resets the owner password offline without touching any data (see TROUBLESHOOTING.md).
+1. **Create the owner account.** There is no default password. A one-time **recovery code** is shown; keep it safe. It resets the owner password without touching any data (*Sign in → Forgot the owner password?*). If the recovery code is lost too, `node scripts/reset-owner-password.mjs` resets the owner password offline without touching any data (see TROUBLESHOOTING.md). To wipe everything and start as a new installation, `node scripts/start-fresh.mjs --yes` moves the data folder aside (nothing is deleted).
 2. **Settings → Shop details.** The address was transcribed from a photograph of the brochure ("Gurunthasala Nagar" in particular may be mis-spelt). Correct it, save, and press *I have checked these details*. **Printing is disabled until you confirm**, and editing the name/address/phones withdraws the confirmation.
 3. **Products → Catalogue review.** Entries whose print was unclear are flagged with the reason. Compare with the paper list, correct, mark verified, then **Approve catalogue for billing**. Printed rates are stored separately and shown whenever a rate is changed.
 4. **Inventory → Opening stock.** Enter counted quantities (or import `sku,qty` CSV). Nothing is invented: every product starts at 0, and with stock enforcement on a bill cannot exceed recorded stock without an authorised override.

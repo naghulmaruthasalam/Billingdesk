@@ -43,7 +43,7 @@ export function LoginPage() {
             <Store className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-base font-semibold leading-tight">Sri Krishna Pattasu Kadai</div>
+            <div className="text-base font-semibold leading-tight">Shree Krishna Pattasu Kadai</div>
             <div className="ta text-sm text-muted-foreground">ஸ்ரீ கிருஷ்ணா பட்டாசு கடை</div>
           </div>
         </div>

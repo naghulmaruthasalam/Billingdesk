@@ -43,7 +43,7 @@ export function AppShell() {
     <div className="flex h-full">
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground" aria-label="Main navigation">
         <div className="border-b border-white/10 px-4 py-3">
-          <div className="text-sm font-semibold leading-tight">{settings?.['shop.name_en'] ?? 'Sri Krishna Pattasu Kadai'}</div>
+          <div className="text-sm font-semibold leading-tight">{settings?.['shop.name_en'] ?? 'Shree Krishna Pattasu Kadai'}</div>
           <div className="ta text-xs text-sidebar-muted">{settings?.['shop.name_ta']}</div>
         </div>
         <nav className="flex-1 overflow-y-auto px-2 py-2">

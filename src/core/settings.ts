@@ -72,7 +72,7 @@ export type SettingKey = keyof typeof SETTINGS_SCHEMA;
 export type SettingValue<K extends SettingKey> = z.infer<(typeof SETTINGS_SCHEMA)[K]>;
 
 export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
-  'shop.name_en': 'Sri Krishna Pattasu Kadai',
+  'shop.name_en': 'Shree Krishna Pattasu Kadai',
   'shop.name_ta': 'ஸ்ரீ கிருஷ்ணா பட்டாசு கடை',
   // Transcribed from a photograph of the brochure. The owner must confirm before invoice printing is enabled.
   'shop.address': '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Kovaipudur, Coimbatore - 641017.',

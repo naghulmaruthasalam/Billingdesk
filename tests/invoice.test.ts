@@ -19,7 +19,7 @@ describe('invoice rendering', () => {
     const { app, inv } = await oneBill();
     for (const size of ['58mm', '80mm', 'a4'] as const) {
       const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: './fonts' });
-      expect(html).toContain('Sri Krishna Pattasu Kadai');
+      expect(html).toContain('Shree Krishna Pattasu Kadai');
       expect(html).toContain('ஸ்ரீ கிருஷ்ணா பட்டாசு கடை');
       expect(html).toContain('கிளாசிக் பாம்');
       expect(html).toContain(inv.invoiceNo);
