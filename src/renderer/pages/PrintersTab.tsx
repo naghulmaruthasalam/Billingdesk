@@ -44,7 +44,7 @@ export function PrintersTab() {
   const label = settings['printing.label_printer'];
   const options = (current: string) => (
     <>
-      <option value="">Ask each time (system print window)</option>
+      <option value="">Ask me which printer each time</option>
       {list.map((p) => (
         <option key={p.name} value={p.name}>
           {p.displayName}
@@ -127,13 +127,13 @@ export function PrintersTab() {
           <Input type="number" min={1} max={5} className="w-24" disabled={!manage} defaultValue={settings['printing.receipt_copies']} onBlur={(e) => { const n = Math.max(1, Math.min(5, Math.round(Number(e.target.value) || 1))); if (n !== settings['printing.receipt_copies']) void save({ 'printing.receipt_copies': n }); }} />
         </Field>
         <div className="flex flex-col justify-end gap-2">
-          <CheckRow checked={settings['printing.silent']} disabled={!manage || !anySelected} onChange={(v) => void save({ 'printing.silent': v })} label="Print without the print window" hint={anySelected ? 'Goes straight to the chosen printer.' : 'Choose a printer first.'} />
+          <CheckRow checked={settings['printing.silent']} disabled={!manage || !anySelected} onChange={(v) => void save({ 'printing.silent': v })} label="Don't ask - always use the printer chosen here" hint={anySelected ? 'Receipts and labels go straight to it (the system default printer if one is not chosen).' : 'Choose a printer first.'} />
           <CheckRow checked={settings['printing.auto_print']} disabled={!manage} onChange={(v) => void save({ 'printing.auto_print': v })} label="Print the receipt automatically after each sale" />
         </div>
       </div>
 
       {(receipt && !list.some((p) => p.name === receipt)) || (label && !list.some((p) => p.name === label)) ? (
-        <Notice tone="red">A saved printer is not connected or no longer installed. Printing will use the system print window until it is back or you pick another printer.</Notice>
+        <Notice tone="red">A saved printer is not connected or no longer installed. Printing will use the system default printer until it is back or you pick another printer.</Notice>
       ) : null}
 
       <div className="flex flex-wrap gap-2">

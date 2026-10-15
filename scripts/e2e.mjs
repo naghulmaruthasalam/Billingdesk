@@ -346,10 +346,29 @@ try {
     await page.getByRole('tab', { name: 'Printers' }).click();
     await page.getByText(PRINTER, { exact: false }).first().waitFor();
     await shot(page, '07c-printers');
+    // Regression for "Print starts, nothing prints, the app closes": printing must go through the in-app printer chooser
+    // (no operating-system print dialog) and the app must stay open.
+    await page.getByRole('link', { name: 'Sales History' }).click();
+    await page.getByTestId('sales-row').filter({ hasText: 'SKP-000001' }).click();
+    await page.getByRole('button', { name: 'Print / reprint' }).click();
+    await page.getByTitle('Invoice preview').waitFor();
+    const tp = Date.now() - 1000;
+    await page.getByRole('button', { name: /^Print/ }).last().click();
+    await page.getByRole('heading', { name: 'Choose printer' }).waitFor();
+    await shot(page, '07d-choose-printer');
+    await page.getByLabel('Printer to use').selectOption({ value: PRINTER });
+    await page.getByTestId('printer-confirm').click();
+    await waitForPrinted(tp, /^SKP-000001/, 'receipt printed through the printer chooser');
+    assert.equal(app.windows().length >= 1, true, 'the application must still be running after printing');
+    await page.getByText(/Sent to CUPS-PDF/).waitFor();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('tab', { name: 'Printers' }).click();
     await page.getByLabel('Receipt printer').selectOption({ value: PRINTER });
     await page.getByLabel('Label printer', { exact: true }).selectOption({ value: PRINTER });
     // These switches save through the backend, so their state flips after the round trip (not instantly).
-    for (const name of ['Print without the print window', 'Print the receipt automatically after each sale']) {
+    for (const name of ['Don\'t ask - always use the printer chosen here', 'Print the receipt automatically after each sale']) {
       const box = page.getByRole('checkbox', { name });
       await page.waitForFunction((n) => [...document.querySelectorAll('[role=checkbox]')].some((b) => b.closest('label')?.textContent?.includes(n) && !b.disabled), name);
       await box.click();

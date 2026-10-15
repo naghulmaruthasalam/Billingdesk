@@ -8,6 +8,7 @@ import { call, errMsg } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useShortcuts, loadShortcuts } from '@/hooks/useShortcuts';
+import { usePrinterChoice } from '@/components/PrinterPicker';
 
 type Size = '58mm' | '80mm' | 'a4';
 
@@ -19,6 +20,7 @@ export function InvoicePrintDialog({ invoiceId, invoiceNo, open, onOpenChange }:
   const [html, setHtml] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const picker = usePrinterChoice('receipt');
 
   useEffect(() => {
     if (open && settings) setSize(settings['invoice.receipt_size']);
@@ -39,9 +41,11 @@ export function InvoicePrintDialog({ invoiceId, invoiceNo, open, onOpenChange }:
 
   const run = async (mode: 'print' | 'pdf') => {
     if (!invoiceId) return;
+    const choice = mode === 'print' ? await picker.choose() : {};
+    if (!choice) return;
     setBusy(true);
     try {
-      const r = await call<{ printed?: boolean; cancelled?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:invoice', { id: invoiceId, size, mode });
+      const r = await call<{ printed?: boolean; cancelled?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:invoice', { id: invoiceId, size, mode, printer: choice.printer });
       if (r.note) toast.info(r.note);
       if (r.printed) toast.success(r.printer ? `Sent to ${r.printer}` : 'Sent to the printer');
       if (r.saved) toast.success(`Saved PDF: ${r.path}`);
@@ -56,6 +60,7 @@ export function InvoicePrintDialog({ invoiceId, invoiceNo, open, onOpenChange }:
   const key = loadShortcuts().printDocument;
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
@@ -90,5 +95,7 @@ export function InvoicePrintDialog({ invoiceId, invoiceNo, open, onOpenChange }:
         </div>
       )}
     </Dialog>
+      {picker.dialog}
+    </>
   );
 }

@@ -11,6 +11,7 @@ import type { InvoiceDTO } from '@/lib/types';
 import { InvoicePrintDialog } from '@/components/InvoicePrintDialog';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { usePrinterChoice } from '@/components/PrinterPicker';
 
 export function SaleDoneDialog({ invoice, onNewBill }: { invoice: InvoiceDTO | null; onNewBill: () => void }) {
   const toast = useToast();
@@ -22,13 +23,17 @@ export function SaleDoneDialog({ invoice, onNewBill }: { invoice: InvoiceDTO | n
 
   const { settings } = useAuth();
   const autoPrinted = useRef<number | null>(null);
+  const picker = usePrinterChoice('receipt');
 
-  const run = async (mode: 'print' | 'pdf') => {
+  const run = async (mode: 'print' | 'pdf', auto = false) => {
     if (!invoice) return;
+    // Automatic printing never asks: it uses the saved (or default) printer.
+    const choice = mode === 'print' && !auto ? await picker.choose() : {};
+    if (!choice) return;
     setBusy(true);
     setPrintError(null);
     try {
-      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:invoice', { id: invoice.id, mode });
+      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:invoice', { id: invoice.id, mode, printer: choice.printer });
       if (r.note) toast.info(r.note);
       if (r.printed) toast.success(r.printer ? `Sent to ${r.printer}` : 'Sent to the printer');
       if (r.saved) toast.success(`Saved PDF: ${r.path}`);
@@ -42,7 +47,7 @@ export function SaleDoneDialog({ invoice, onNewBill }: { invoice: InvoiceDTO | n
   useEffect(() => {
     if (invoice && settings?.['printing.auto_print'] && autoPrinted.current !== invoice.id) {
       autoPrinted.current = invoice.id;
-      void run('print');
+      void run('print', true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice?.id]);
@@ -92,6 +97,7 @@ export function SaleDoneDialog({ invoice, onNewBill }: { invoice: InvoiceDTO | n
           </div>
         )}
       </Dialog>
+      {picker.dialog}
       <InvoicePrintDialog invoiceId={invoice?.id ?? null} invoiceNo={invoice?.invoiceNo} open={open && preview} onOpenChange={setPreview} />
     </>
   );

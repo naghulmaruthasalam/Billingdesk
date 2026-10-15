@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/toast';
 import { useDebounced } from '@/hooks/useApi';
 import { DEFAULT_LABEL_LAYOUT, type LabelLayout } from '@shared/labelHtml';
+import { usePrinterChoice } from '@/components/PrinterPicker';
 
 export interface LabelRun {
   productId: number;
@@ -45,6 +46,7 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
   const [prev, setPrev] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const picker = usePrinterChoice('label');
 
   useEffect(() => {
     if (settings) setLayout(settings['labels.layout']);
@@ -75,9 +77,11 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
   const set = <K extends keyof LabelLayout>(k: K, v: LabelLayout[K]) => setLayout((l) => ({ ...l, [k]: v }));
 
   const run = async (mode: 'print' | 'pdf') => {
+    const choice = mode === 'print' ? await picker.choose() : {};
+    if (!choice) return;
     setBusy(true);
     try {
-      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:labels', { items, layout, startAt: layout.kind === 'a4' ? startAt : 0, mode });
+      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:labels', { items, layout, startAt: layout.kind === 'a4' ? startAt : 0, mode, printer: choice.printer });
       if (r.note) toast.info(r.note);
       if (r.printed) toast.success(r.printer ? `Labels sent to ${r.printer}` : 'Labels sent to the printer');
       if (r.saved) toast.success(`Saved PDF: ${r.path}`);
@@ -127,7 +131,7 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
         <CheckRow checked={layout.showTamil} onChange={(v) => set('showTamil', v)} label="Tamil name" />
         <CheckRow checked={layout.showPrice} onChange={(v) => set('showPrice', v)} label="Price" />
         {can('settings.manage') && <Button variant="outline" size="sm" onClick={() => void saveDefault()}><Save /> Save as shop default</Button>}
-        <p className="text-xs text-muted-foreground">Install your label printer's driver and pick the same paper size in its settings (margins zero). The printer is then chosen in the system print window.</p>
+        <p className="text-xs text-muted-foreground">Install your label printer's driver and pick the same paper size in its settings (margins zero). You choose the printer when you press Print (or set it in Settings → Printers).</p>
       </div>
 
       <div className="flex min-w-0 flex-col gap-2">
@@ -151,6 +155,7 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
           prev && <iframe title="Label preview" sandbox="" srcDoc={prev.html} className="w-full rounded-md border border-border bg-muted" style={{ height: previewHeight }} />
         )}
       </div>
+      {picker.dialog}
     </div>
   );
 }

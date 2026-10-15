@@ -146,14 +146,14 @@ Inside: `data/skbilling.sqlite` (WAL mode, `synchronous=FULL`), `backups/`, `log
 
 *Settings → Printers* lists the printers installed on the computer (with their status) and lets the owner choose:
 
-* the **receipt / invoice printer** and the **barcode label printer** - each can be a different device, or "Ask each time" to use the system print window;
-* **Print without the print window** - receipts and labels go straight to the chosen printer;
+* the **receipt / invoice printer** and the **barcode label printer** - each can be a different device, or "Ask me which printer each time" - the app then shows its own **Choose printer** window when you press Print (the operating system's print dialog is never used: it has to be opened from a hidden window, which is unreliable on Linux);
+* **Don't ask - always use the printer chosen here** - receipts and labels go straight to it (the system default printer if none is chosen);
 * **Receipt copies** (1-5) and **Print the receipt automatically after each sale** (the sale-complete screen prints it for you, once, then you press *New bill*);
 * **Print test receipt** and **Print test label** buttons that send a clearly marked SAMPLE page / a real product label to the selected printer.
 
-If a saved printer is unplugged or uninstalled, billing is never blocked: the app falls back to the system print window and tells the cashier which printer was missing. Paper size comes from *Invoices & printing* (58 mm / 80 mm / A4) and the label layout; in the printer driver choose the same size with zero margins. Printing uses the operating system's drivers (Windows spooler, CUPS on Linux) - thermal receipt printers need a driver or a CUPS queue; raw ESC/POS and cash-drawer kick are not sent. Save-as-PDF is always available.
+If a saved printer is unplugged or uninstalled, billing is never blocked: the app uses the system default printer and tells the cashier which printer was missing; if no printer is installed at all it says so and offers Save as PDF. Paper size comes from *Invoices & printing* (58 mm / 80 mm / A4) and the label layout; in the printer driver choose the same size with zero margins. Printing uses the operating system's drivers (Windows spooler, CUPS on Linux) - thermal receipt printers need a driver or a CUPS queue; raw ESC/POS and cash-drawer kick are not sent. Save-as-PDF is always available.
 
-On Linux add the printer first in *Settings → Printers* or at `http://localhost:631` (CUPS); check with `lpstat -p`. The end-to-end run sets up a real CUPS queue (`CUPS-PDF`) and verifies silent test receipt, silent test label (barcode decoded) and auto-print after a sale (`E2E_PRINTER=CUPS-PDF`).
+On Linux add the printer first in *Settings → Printers* or at `http://localhost:631` (CUPS); check with `lpstat -p`. The end-to-end run sets up a real CUPS queue (`CUPS-PDF`) and verifies a receipt printed through the Choose-printer window (and that the app stays open), silent test receipt, silent test label (barcode decoded) and auto-print after a sale (`E2E_PRINTER=CUPS-PDF`).
 
 ## Building packages
 
