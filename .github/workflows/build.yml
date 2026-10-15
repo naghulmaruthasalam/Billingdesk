@@ -113,3 +113,27 @@ jobs:
         with:
           name: sri-krishna-billing-windows-installer
           path: release/SriKrishnaBilling-Setup-*.exe
+
+  # Manual only (Actions > Run workflow): publishes the installer that just passed the silent-install + end-to-end run
+  # above as a GitHub Release asset, so it can be downloaded with a normal link (no Actions artifact login needed).
+  release:
+    name: Publish Windows installer as a release download
+    if: github.event_name == 'workflow_dispatch'
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sri-krishna-billing-windows-installer
+          path: dist-win
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="windows-${GITHUB_SHA::7}"
+          gh release create "$tag" dist-win/SriKrishnaBilling-Setup-*.exe \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Windows installer (build ${GITHUB_SHA::7})" \
+            --notes "Windows installer built from commit $GITHUB_SHA. It passed a silent install and the full end-to-end run on a Windows runner. Unsigned: Windows SmartScreen will warn (More info > Run anyway)."
