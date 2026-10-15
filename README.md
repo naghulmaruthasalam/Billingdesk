@@ -155,6 +155,17 @@ If a saved printer is unplugged or uninstalled, billing is never blocked: the ap
 
 On Linux add the printer first in *Settings → Printers* or at `http://localhost:631` (CUPS); check with `lpstat -p`. The end-to-end run sets up a real CUPS queue (`CUPS-PDF`) and verifies a receipt printed through the Choose-printer window (and that the app stays open), silent test receipt, silent test label (barcode decoded) and auto-print after a sale (`E2E_PRINTER=CUPS-PDF`).
 
+### Thermal receipt printers (Rongta RP-3200, Epson TM, Xprinter, ...) on Linux
+
+Many receipt printers get a CUPS queue with a **text-only driver** (the options list shows *PrinterEncoding*, *NumLines*, *NumColumns*). Such a queue cannot print a page, so nothing comes out in the normal "Printer driver" mode. Choose **Settings → Printers → How receipts are sent → Thermal receipt printer - ESC/POS** instead:
+
+* the receipt is drawn as a 1-bit picture at the printer's native width (80 mm paper = 576 dots, 58 mm = 384 dots) - so Tamil, bold text, ₹ and barcodes all print - and sent as ESC/POS raster commands through a raw print job (`lp -o raw`), which bypasses the queue's driver;
+* the paper is cut after each receipt (switch off with *Cut the paper after each receipt*); copies and auto-print work as before;
+* the app suggests this mode automatically when the selected queue looks like a thermal printer;
+* A4 invoices always use the driver; Windows uses the driver (install the printer's Windows driver).
+
+The end-to-end run checks this against a fake network printer (`scripts/fake-thermal-printer.mjs`) behind a real raw CUPS queue and decodes the captured bytes back to the receipt image.
+
 ## Building packages
 
 Build each package on (or for) its platform. The commands below were run in this repository's development environment (Ubuntu 24.04, with `rpm` and `wine` installed for cross-building); see [Limitations](#limitations) for what was and was not verified on real Windows/Fedora.

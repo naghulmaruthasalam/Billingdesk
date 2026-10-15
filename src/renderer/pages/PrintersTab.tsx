@@ -14,8 +14,12 @@ interface PrinterInfo {
   displayName: string;
   description: string;
   isDefault: boolean;
+  model: string;
   status: number;
 }
+
+/** Printers that cannot print a normal page through their driver: text-only drivers, or queues that look like thermal receipt printers. */
+const looksThermal = (p: PrinterInfo | undefined): boolean => !!p && (/text[- ]?only|raw/i.test(p.model) || /\b(RP-?\d|TM-?[A-Z]?\d|POS|thermal|receipt|XP-?\d|TSP)/i.test(`${p.name} ${p.displayName}`));
 
 const stateLabel = (s: number): { text: string; tone: 'green' | 'amber' | 'red' | 'neutral' } =>
   s === 3 ? { text: 'ready', tone: 'green' } : s === 4 ? { text: 'printing', tone: 'amber' } : s === 5 ? { text: 'stopped - check printer', tone: 'red' } : { text: 'status not reported', tone: 'neutral' };
@@ -103,7 +107,7 @@ export function PrintersTab() {
               <div key={p.name} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 font-medium"><Printer className="h-4 w-4 shrink-0 text-muted-foreground" /> <span className="truncate">{p.displayName}</span> {p.isDefault && <Badge tone="gold">system default</Badge>}</div>
-                  {p.description && <div className="truncate text-xs text-muted-foreground">{p.description}</div>}
+                  {(p.model || p.description) && <div className="truncate text-xs text-muted-foreground">{[p.model, p.description].filter(Boolean).join(' · ')}</div>}
                 </div>
                 <Badge tone={st.tone}>{st.text}</Badge>
               </div>
@@ -123,6 +127,17 @@ export function PrintersTab() {
             {options(label)}
           </Select>
         </Field>
+        <Field label="How receipts are sent" hint={settings['printing.receipt_method'] === 'escpos' ? 'The receipt is drawn as a picture and sent in ESC/POS commands. Works without a driver and prints Tamil.' : 'Normal printing through the printer driver.'}>
+          <Select value={settings['printing.receipt_method']} disabled={!manage} onChange={(e) => void save({ 'printing.receipt_method': e.target.value })} aria-label="How receipts are sent">
+            <option value="driver">Printer driver (normal printers, A4)</option>
+            <option value="escpos">Thermal receipt printer - ESC/POS (Linux, no driver needed)</option>
+          </Select>
+        </Field>
+        {settings['printing.receipt_method'] === 'escpos' ? (
+          <div className="flex items-end">
+            <CheckRow checked={settings['printing.cut']} disabled={!manage} onChange={(v) => void save({ 'printing.cut': v })} label="Cut the paper after each receipt" hint="Ignored by printers without a cutter." />
+          </div>
+        ) : <div />}
         <Field label="Receipt copies" hint="Printed for every receipt">
           <Input type="number" min={1} max={5} className="w-24" disabled={!manage} defaultValue={settings['printing.receipt_copies']} onBlur={(e) => { const n = Math.max(1, Math.min(5, Math.round(Number(e.target.value) || 1))); if (n !== settings['printing.receipt_copies']) void save({ 'printing.receipt_copies': n }); }} />
         </Field>
@@ -135,6 +150,13 @@ export function PrintersTab() {
       {(receipt && !list.some((p) => p.name === receipt)) || (label && !list.some((p) => p.name === label)) ? (
         <Notice tone="red">A saved printer is not connected or no longer installed. Printing will use the system default printer until it is back or you pick another printer.</Notice>
       ) : null}
+
+      {settings['printing.receipt_method'] === 'driver' && looksThermal(list.find((p) => p.name === (receipt || list.find((x) => x.isDefault)?.name))) && (
+        <Notice tone="amber">
+          <b>This looks like a thermal receipt printer.</b> If its queue uses a text-only or no driver, nothing will print in "Printer driver" mode.{' '}
+          <Button size="sm" variant="outline" className="ml-1" disabled={!manage} onClick={() => void save({ 'printing.receipt_method': 'escpos' })}>Switch to thermal (ESC/POS) mode</Button>
+        </Notice>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={busy !== null} onClick={() => void testReceipt()}><Printer /> Print test receipt</Button>

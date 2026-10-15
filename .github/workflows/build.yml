@@ -29,12 +29,19 @@ jobs:
           sleep 2
           sudo lpadmin -p CUPS-PDF -E -v cups-pdf:/ -m lsb/usr/cups-pdf/CUPS-PDF_opt.ppd
           sudo lpadmin -d CUPS-PDF
+          # A fake network thermal printer (raw TCP 9100) behind a raw CUPS queue, to capture the ESC/POS bytes
+          mkdir -p "$RUNNER_TEMP/fakeprn"
+          nohup node scripts/fake-thermal-printer.mjs "$RUNNER_TEMP/fakeprn" > "$RUNNER_TEMP/fakeprn.log" 2>&1 &
+          sleep 1
+          sudo lpadmin -p RP-RAW -E -v socket://127.0.0.1:9100 -m raw
           lpstat -p -d
       - name: End-to-end (real Electron app, virtual display)
         run: xvfb-run -a npm run test:e2e
         env:
           E2E_OUT: ${{ github.workspace }}/e2e-output
           E2E_PRINTER: CUPS-PDF
+          E2E_ESCPOS_PRINTER: RP-RAW
+          E2E_ESCPOS_DIR: ${{ runner.temp }}/fakeprn
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, shell, type WebContents } from 'electron';
 import { mkdirSync, readFileSync, writeFileSync, rmSync, statSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { bgraToGray, encodeReceipt, THERMAL_PAPER } from '../core/escpos';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
@@ -33,6 +35,58 @@ function requireSignedIn(rt: Runtime): void {
 const filtersSchema = z.array(z.object({ name: z.string().max(40), extensions: z.array(z.string().regex(/^[A-Za-z0-9]{1,8}$/)).max(6) })).max(4).optional();
 
 /** Print a standalone HTML document through a hidden, sandboxed window. */
+/**
+ * Thermal receipt printing without a driver: draw the receipt page into a 1-bit image at the printer's native width and
+ * send it as ESC/POS raster commands through a raw print queue (`lp -o raw`). Works with queues that have no driver or only
+ * a text-only driver. Not available on Windows (use the driver there).
+ */
+async function printEscPos(_state: NativeState, html: string, size: '58mm' | '80mm', target: PrintTarget & { note?: string }, cut: boolean): Promise<Result> {
+  if (process.platform === 'win32') return err('VALIDATION', 'Thermal (ESC/POS) mode is available on Linux. On Windows install the printer driver and use the "driver" method.');
+  const { dots, printableMm } = THERMAL_PAPER[size];
+  const cssWidth = (printableMm * 96) / 25.4;
+  const zoom = dots / cssWidth; // zoom so the layout is rendered directly at 1 CSS px = 1/zoom dots: crisp, not up-scaled
+  mkdirSync(tempDir(), { recursive: true });
+  const stamp = `${process.pid}-${Date.now()}`;
+  const htmlFile = join(tempDir(), `escpos-${stamp}.html`);
+  const binFile = join(tempDir(), `escpos-${stamp}.bin`);
+  writeFileSync(htmlFile, html, 'utf8');
+  const win = new BrowserWindow({ show: false, width: dots, height: 600, useContentSize: true, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, zoomFactor: zoom } });
+  win.webContents.on('render-process-gone', (_e, d) => log.error('receipt renderer gone', d));
+  try {
+    win.webContents.setFrameRate(5);
+    await win.loadFile(htmlFile);
+    win.webContents.setZoomFactor(zoom);
+    await win.webContents.executeJavaScript('document.fonts ? document.fonts.ready.then(() => true) : true');
+    await new Promise((r) => setTimeout(r, 300));
+    const cssHeight = (await win.webContents.executeJavaScript('Math.ceil(document.body.getBoundingClientRect().height + 8)')) as number;
+    const height = Math.max(40, Math.ceil(cssHeight * zoom));
+    win.setContentSize(dots, height);
+    await new Promise((r) => setTimeout(r, 800)); // let the offscreen surface repaint at the new size
+    const img = await win.webContents.capturePage();
+    const sz = img.getSize();
+    if (sz.width !== dots || sz.height < 40) throw new Error(`Receipt image has an unexpected size ${sz.width}x${sz.height}`);
+    const raster = bgraToGray(img.toBitmap(), sz.width, sz.height);
+    writeFileSync(binFile, encodeReceipt(raster, { cut, copies: target.copies }));
+    await new Promise<void>((resolve, reject) => {
+      // Fixed argument list, no shell; the printer name was matched against the installed printers.
+      execFile('lp', ['-d', target.deviceName!, '-o', 'raw', '-t', 'Receipt', binFile], { timeout: 20000 }, (e, _out, stderr) => {
+        if (e) reject(new Error((stderr || e.message).trim()));
+        else resolve();
+      });
+    });
+    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method: 'escpos', note: target.note ?? null });
+  } catch (e) {
+    log.error('ESC/POS print failed', e);
+    return err('INTERNAL', `Printing failed: ${e instanceof Error ? e.message : String(e)}. Check that the printer is on, has paper and is selected in Settings → Printers.`);
+  } finally {
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.destroy();
+      rmSync(htmlFile, { force: true });
+      rmSync(binFile, { force: true });
+    }, 4000);
+  }
+}
+
 type PrintPage =
   | { kind: 'receipt'; size: ReceiptSize }
   /** Exact page size in micrometres, zero margins (barcode labels: position matters). */
@@ -53,6 +107,8 @@ export interface PrinterInfo {
   displayName: string;
   description: string;
   isDefault: boolean;
+  /** Driver description reported by the print system, e.g. "Generic text-only printer". */
+  model: string;
   /** CUPS printer-state when reported: 3 idle, 4 printing, 5 stopped. 0 when the platform does not say. */
   status: number;
 }
@@ -61,7 +117,7 @@ async function listPrinters(state: NativeState): Promise<PrinterInfo[]> {
   const wc = state.getWindow()?.webContents;
   if (!wc) return [];
   const list = await wc.getPrintersAsync();
-  return list.map((p) => ({ name: p.name, displayName: p.displayName || p.name, description: p.description ?? '', isDefault: String((p.options as Record<string, unknown> | undefined)?.['is-default']) === 'true', status: Number((p.options as Record<string, unknown> | undefined)?.['printer-state'] ?? 0) || 0 }));
+  return list.map((p) => ({ name: p.name, displayName: p.displayName || p.name, description: p.description ?? '', model: String((p.options as Record<string, unknown> | undefined)?.['printer-make-and-model'] ?? ''), isDefault: String((p.options as Record<string, unknown> | undefined)?.['is-default']) === 'true', status: Number((p.options as Record<string, unknown> | undefined)?.['printer-state'] ?? 0) || 0 }));
 }
 
 /**
@@ -211,7 +267,9 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const size = p.size ?? getSetting(rt.db, 'invoice.receipt_size');
         const html = buildInvoiceHtml(rt, rt.ctx(), p.id, size, fontBase);
         const inv = rt.db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(p.id) as { invoice_no: string };
-        const res = await printHtml(state, html, size, p.mode, `${inv.invoice_no}.pdf`, p.mode === 'print' ? await resolveTarget(rt, state, 'receipt', p.printer) : undefined);
+        const target = p.mode === 'print' ? await resolveTarget(rt, state, 'receipt', p.printer) : undefined;
+        const useEscPos = p.mode === 'print' && size !== 'a4' && getSetting(rt.db, 'printing.receipt_method') === 'escpos';
+        const res = useEscPos ? await printEscPos(state, html, size as '58mm' | '80mm', target!, getSetting(rt.db, 'printing.cut')) : await printHtml(state, html, size, p.mode, `${inv.invoice_no}.pdf`, target);
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };
           if (d.printed || d.saved) recordInvoicePrint(rt.ctx(), p.id, p.mode);
@@ -246,6 +304,7 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const target = p.mode === 'print' ? await resolveTarget(rt, state, 'receipt', p.printer) : undefined;
         const fontBase = pathToFileURL(join(state.rendererRoot, 'fonts')).toString();
         const html = renderInvoiceHtml(sampleInvoice(), shopForPrint(rt), { size: p.size, fontBase });
+        if (target && p.size !== 'a4' && getSetting(rt.db, 'printing.receipt_method') === 'escpos') return await printEscPos(state, html, p.size, target, getSetting(rt.db, 'printing.cut'));
         return await printHtml(state, html, p.size, p.mode, 'test-print.pdf', target);
       }
       default:

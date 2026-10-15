@@ -4,7 +4,7 @@
 //   Windows: node scripts/e2e.mjs
 // Environment: E2E_OUT=<dir> for screenshots/PDF (default ./e2e-output), E2E_EXECUTABLE=<path> to test a packaged build.
 import { _electron as electron } from 'playwright-core';
-import { mkdirSync, mkdtempSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -385,6 +385,45 @@ try {
       const decoded = decodePdf(lab.file, join(out, 'printed-label'));
       assert.equal(decoded.length, 1, 'the printed label must contain one decodable barcode');
     }
+  });
+
+  await step('thermal receipt printer: ESC/POS raster job reaches a raw queue (RP-3200 style), app stays open', async () => {
+    const dir = process.env.E2E_ESCPOS_DIR;
+    const rawPrinter = process.env.E2E_ESCPOS_PRINTER;
+    if (!dir || !rawPrinter) return console.log('    (set E2E_ESCPOS_DIR and E2E_ESCPOS_PRINTER - see scripts/fake-thermal-printer.mjs - to run this step)');
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('tab', { name: 'Printers' }).click();
+    await page.getByLabel('Receipt printer').selectOption({ value: rawPrinter });
+    await page.waitForFunction(() => document.querySelector('[aria-label="Receipt printer"]').value !== '');
+    await page.getByLabel('How receipts are sent').selectOption({ value: 'escpos' });
+    await page.waitForTimeout(500);
+    await shot(page, '07e-escpos-settings');
+    const before = existsSync(dir) ? readdirSync(dir).length : 0;
+    await page.getByRole('button', { name: 'Print test receipt' }).click();
+    let file;
+    for (let i = 0; i < 60 && !file; i++) {
+      await page.waitForTimeout(500);
+      const now = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.bin')).sort() : [];
+      if (now.length > before) file = join(dir, now[now.length - 1]);
+    }
+    assert.ok(file, 'no ESC/POS job arrived at the raw printer queue');
+    const buf = readFileSync(file);
+    assert.deepEqual([...buf.subarray(0, 2)], [0x1b, 0x40], 'job must start with ESC @');
+    assert.deepEqual([...buf.subarray(2, 6)], [0x1d, 0x76, 0x30, 0x00], 'then a GS v 0 raster block');
+    assert.equal(buf[6] | (buf[7] << 8), 72, '576 dots = 72 bytes per row (80 mm paper)');
+    assert.deepEqual([...buf.subarray(buf.length - 3)], [0x1d, 0x56, 0x01], 'job must end with a cut');
+    assert.ok(buf.length > 20000, 'raster data looks too small');
+    // Decode the raster to a PBM image so the receipt can be inspected visually (and by OCR-free checks).
+    let i = 2, rows = 0; const parts = [];
+    while (i < buf.length && buf[i] === 0x1d && buf[i + 1] === 0x76) { const bpr = buf[i + 4] | (buf[i + 5] << 8), h = buf[i + 6] | (buf[i + 7] << 8); parts.push(buf.subarray(i + 8, i + 8 + bpr * h)); rows += h; i += 8 + bpr * h; }
+    writeFileSync(join(out, 'escpos-receipt.pbm'), Buffer.concat([Buffer.from(`P4\n576 ${rows}\n`), ...parts]));
+    assert.ok(rows > 300, 'receipt image is too short');
+    assert.ok(app.windows().length >= 1, 'the application must still be running');
+    await page.getByText(/Test receipt sent to/).waitFor();
+    // switch back so later steps use the normal driver queue
+    await page.getByLabel('How receipts are sent').selectOption({ value: 'driver' });
+    await page.getByLabel('Receipt printer').selectOption({ value: PRINTER ?? '' });
+    await page.waitForTimeout(500);
   });
 
   await step('dashboard totals and reports', async () => {

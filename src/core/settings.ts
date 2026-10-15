@@ -60,6 +60,10 @@ export const SETTINGS_SCHEMA = {
   'printing.receipt_copies': z.number().int().min(1).max(5),
   /** Print the receipt automatically as soon as a sale is completed. */
   'printing.auto_print': z.boolean(),
+  /** 'driver': print through the printer driver. 'escpos': draw the receipt as an image and send ESC/POS commands (thermal receipt printers; no driver needed). */
+  'printing.receipt_method': z.enum(['driver', 'escpos']),
+  /** Cut the paper after each receipt in ESC/POS mode. */
+  'printing.cut': z.boolean(),
   'auth.recovery_hash': z.string().max(200),
   'catalogue.seeded': z.boolean(),
 } as const;
@@ -104,6 +108,8 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'printing.silent': false,
   'printing.receipt_copies': 1,
   'printing.auto_print': false,
+  'printing.receipt_method': 'driver',
+  'printing.cut': true,
   'auth.recovery_hash': '',
   'catalogue.seeded': false,
 };
