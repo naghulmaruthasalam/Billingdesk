@@ -1,6 +1,6 @@
 # Sri Krishna Billing
 
-Offline-first desktop billing, inventory and reporting for **Shree Krishna Pattasu Kadai** (ஸ்ரீ கிருஷ்ணா பட்டாசு கடை), Kovaipudur, Coimbatore.
+Offline-first desktop billing, inventory and reporting for **Shree Krishna Pattasu Kadai** (ஸ்ரீ கிருஷ்ணா பட்டாசு கடை), Coimbatore.
 
 **Bills, receipts and labels are printed in English only.** Tamil names stay in the catalogue for searching and can be switched back on under *Settings → Invoices* ("Also print Tamil names") and in the label options.
 

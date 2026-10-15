@@ -296,6 +296,10 @@ export function PosPage() {
             }
           />
           {settings['tax.enabled'] && totals.taxPaise >= 0 && settings['tax.rate_bp'] > 0 && <Row label={`${settings['tax.label']} ${bpToPercent(settings['tax.rate_bp'])}%${settings['tax.inclusive'] ? ' (included)' : ''}`} value={formatINR(totals.taxPaise)} />}
+          <div className="flex justify-between py-0.5 text-sm font-semibold" data-testid="cart-qty">
+            <span>Total qty</span>
+            <span className="num">{lines.reduce((n, l) => n + l.qty, 0)}</span>
+          </div>
           <div className="mt-1 flex items-baseline justify-between border-t border-border pt-2">
             <span className="text-sm font-medium">Payable</span>
             <span className="num text-2xl font-semibold text-primary" data-testid="cart-total">

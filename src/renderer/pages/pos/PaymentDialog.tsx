@@ -80,6 +80,7 @@ export function PaymentDialog({ open, onOpenChange, lines, totals, customer, bus
       logoDataUrl: settings['shop.logo_data_url'],
       footerEn: settings['invoice.footer_en'],
       footerTa: settings['invoice.footer_ta'],
+      greeting: settings['invoice.greeting'],
       taxLabel: settings['tax.label'],
       showTamil: settings['invoice.show_tamil'],
     }, { size: '80mm', fontBase: './fonts' });

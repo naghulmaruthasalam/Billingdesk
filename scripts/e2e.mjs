@@ -196,6 +196,7 @@ try {
     // the discount is given once, on the total bill: cart rows show list amounts only (65.00, 300.00, 450.00)
     await page.getByText('Discount (on total bill)').waitFor();
     await page.getByTestId('change-discount').waitFor();
+    assert.equal((await page.getByTestId('cart-qty').innerText()).replace(/\D+/g, ''), '4', 'total quantity shown beside the total (1 + 2 + 1)');
     const rowsText = await lines.allInnerTexts();
     assert.ok(rowsText.every((t) => !/%/.test(t)), 'no per-item discount shown in the cart rows');
     assert.ok(/65\.00/.test(rowsText[0]) && /300\.00/.test(rowsText[1]) && /450\.00/.test(rowsText[2]), 'cart rows show list amounts');
@@ -234,6 +235,10 @@ try {
       assert.match(text, /Shree Krishna Pattasu Kadai/);
       assert.doesNotMatch(text, /[\u0B80-\u0BFF]/, 'bills are English only - no Tamil expected');
       assert.match(text, /Discount on total bill/);
+      assert.match(text, /Total qty\s+\d+/);
+      assert.match(text, /Goods once sold cannot be taken back/);
+      assert.match(text, /Happy Diwali/);
+      assert.doesNotMatch(text, /Kovaipudur/);
       assert.match(text, /778\.50/);
       assert.match(text, /Classic Bomb/);
       assert.doesNotMatch(text, /DUPLICATE COPY/, 'first print must not be marked as a duplicate');

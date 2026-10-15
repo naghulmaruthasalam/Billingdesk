@@ -64,6 +64,7 @@ export function shopForPrint(rt: Runtime): PrintableShop {
     logoDataUrl: g('shop.logo_data_url'),
     footerEn: g('invoice.footer_en'),
     footerTa: g('invoice.footer_ta'),
+    greeting: g('invoice.greeting'),
     taxLabel: g('tax.label'),
     showTamil: g('invoice.show_tamil'),
   };

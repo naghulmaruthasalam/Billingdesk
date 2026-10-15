@@ -141,6 +141,7 @@ export function SettingsPage() {
             <Field label="Default receipt size"><Select value={d['invoice.receipt_size']} onChange={(e) => set('invoice.receipt_size', e.target.value as AllSettings['invoice.receipt_size'])}><option value="58mm">58 mm thermal</option><option value="80mm">80 mm thermal</option><option value="a4">A4 invoice</option></Select></Field>
             <div className="flex items-end"><CheckRow checked={d['invoice.show_tamil']} onChange={(v) => set('invoice.show_tamil', v)} label="Also print Tamil names (optional - bills are English by default)" /></div>
             <Field label="Footer line (English)"><Input value={d['invoice.footer_en']} onChange={(e) => set('invoice.footer_en', e.target.value)} /></Field>
+            <Field label="Greeting (last line of the bill)"><Input value={d['invoice.greeting']} onChange={(e) => set('invoice.greeting', e.target.value)} /></Field>
             <Field label="Footer line (Tamil)"><Input className="ta" value={d['invoice.footer_ta']} onChange={(e) => set('invoice.footer_ta', e.target.value)} /></Field>
             <div className="col-span-2 flex flex-wrap items-center gap-2">
               <Button variant="outline" onClick={() => void testPrint('print')} disabled={!manage}><Printer /> Print test page</Button>

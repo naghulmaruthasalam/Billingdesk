@@ -43,6 +43,19 @@ describe('invoice rendering', () => {
     }
   });
 
+  it('shows the total quantity beside the total, the no-return tagline and the greeting', async () => {
+    const { app, inv } = await oneBill();
+    for (const size of ['58mm', '80mm', 'a4'] as const) {
+      const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: '.' });
+      expect(html).toMatch(/Total qty<\/span><span class="num">2<\/span>/); // 2 x Classic Bomb
+      expect(html.indexOf('Total qty')).toBeLessThan(html.indexOf('Net payable'));
+      expect(html).toContain('Goods once sold cannot be taken back.');
+      expect(html).toContain('Happy Diwali 🎆');
+      expect(html.lastIndexOf('Happy Diwali')).toBeGreaterThan(html.indexOf('Goods once sold'));
+      expect(html).not.toContain('Kovaipudur');
+    }
+  });
+
   it('can optionally add Tamil, marks cancelled bills, drafts and test pages', async () => {
     const { app, inv } = await oneBill();
     const shop = { ...shopForPrint(app.rt), showTamil: true };
