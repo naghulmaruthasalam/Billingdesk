@@ -119,7 +119,7 @@ jobs:
   release:
     name: Publish installers as a release download
     if: github.event_name == 'workflow_dispatch'
-    needs: [windows, fedora]
+    needs: [windows, rpm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
