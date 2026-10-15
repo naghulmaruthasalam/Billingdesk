@@ -21,7 +21,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - name: System libraries for headless Electron
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 poppler-utils
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 poppler-utils zbar-tools
       - name: End-to-end (real Electron app, virtual display)
         run: xvfb-run -a npm run test:e2e
         env:
@@ -38,7 +38,7 @@ jobs:
     container: fedora:latest
     steps:
       - name: Tooling
-        run: dnf install -y nodejs npm git rpm-build libxcrypt-compat xorg-x11-server-Xvfb gtk3 nss alsa-lib libXScrnSaver libXtst at-spi2-core libnotify xdg-utils poppler-utils which findutils tar xz
+        run: dnf install -y nodejs npm git rpm-build libxcrypt-compat xorg-x11-server-Xvfb gtk3 nss alsa-lib libXScrnSaver libXtst at-spi2-core libnotify xdg-utils poppler-utils zbar which findutils tar xz
       - uses: actions/checkout@v4
       # Some npm versions try `node-gyp rebuild` for better-sqlite3 (it has a binding.gyp) even though it ships
       # prebuilt N-API binaries. Skipping install scripts avoids needing a compiler; Electron's binary is fetched explicitly.

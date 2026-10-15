@@ -52,7 +52,7 @@ export const ProductPicker = forwardRef<PickerHandle, { onAdd: (p: ProductDTO, q
         // exact barcode / SKU (scanner input ends with Enter)
         try {
           const p = await call<ProductDTO | null>('products:byCode', { code });
-          if (p && p.pricePaise !== null) return add(p);
+          if (p && p.pricePaise !== null && p.active) return add(p);
         } catch {
           /* fall through to the highlighted result */
         }

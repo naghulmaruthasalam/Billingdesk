@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Minus, Percent, Plus, Trash2, UserRound, X } from 'lucide-react';
+import { Minus, Percent, Plus, ScanBarcode, Trash2, UserRound, Volume2, VolumeX, X } from 'lucide-react';
 import { call, ApiError, errMsg } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/toast';
 import { useShortcuts, loadShortcuts } from '@/hooks/useShortcuts';
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
+import { beep, scanSoundEnabled, setScanSound } from '@/lib/beep';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/form';
 import { Badge, Kbd, Notice } from '@/components/ui/misc';
@@ -36,6 +38,8 @@ export function PosPage() {
   const [approvalFor, setApprovalFor] = useState<{ reason: string; payments: PaymentInput[] } | null>(null);
   const [clearAsk, setClearAsk] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [lastScan, setLastScan] = useState<{ text: string; ok: boolean } | null>(null);
+  const [sound, setSound] = useState(scanSoundEnabled());
   const requestId = useRef(newRequestId());
   const qtyRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -146,13 +150,53 @@ export function PosPage() {
     }
   };
 
+  const dialogOpen = payOpen || override !== null || approvalFor !== null || clearAsk;
+
+  // Barcode scanner: add the scanned product wherever the cursor is. A scan after a completed sale starts the next bill.
+  useBarcodeScanner((code) => {
+    const fail = (text: string) => {
+      beep('error');
+      setLastScan({ text, ok: false });
+    };
+    if (dialogOpen) return fail('Close the open window before scanning');
+    void call<ProductDTO | null>('products:byCode', { code })
+      .then((p) => {
+        if (!p) return fail(`Unknown barcode ${code}`);
+        if (!p.active) return fail(`${p.nameEn} is inactive and cannot be sold`);
+        if (p.pricePaise === null) return fail(`${p.nameEn} has no price`);
+        if (done) newBill();
+        addProduct(p, 1);
+        beep('ok');
+        setLastScan({ text: `${p.nameEn} added`, ok: true });
+      })
+      .catch((e) => fail(errMsg(e)));
+  });
+  useEffect(() => {
+    if (!lastScan) return;
+    const t = setTimeout(() => setLastScan(null), 3500);
+    return () => clearTimeout(t);
+  }, [lastScan]);
+
   if (!settings || !totals) return null;
   const overrideLine = lines.find((l) => l.key === override) ?? null;
   const noItems = lines.length === 0;
 
   return (
     <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_440px] gap-4">
-      <ProductPicker ref={picker} onAdd={addProduct} cartQty={cartQty} refreshKey={refreshKey} />
+      <div className="flex min-h-0 flex-col gap-2">
+        <div className={cn('flex h-8 shrink-0 items-center justify-between rounded-md border px-3 text-xs', lastScan ? (lastScan.ok ? 'border-primary/40 bg-secondary text-secondary-foreground' : 'border-destructive/40 bg-destructive/10 text-destructive') : 'border-border bg-card text-muted-foreground')} role="status" aria-live="polite" data-testid="scan-status">
+          <span className="flex items-center gap-2">
+            <ScanBarcode className="h-4 w-4" />
+            {lastScan ? lastScan.text : 'Scanner ready - scan any product label, the cursor can be anywhere'}
+          </span>
+          <button className="flex items-center gap-1 hover:text-foreground" aria-label={sound ? 'Mute scanner beep' : 'Unmute scanner beep'} onClick={() => { setScanSound(!sound); setSound(!sound); }}>
+            {sound ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} {sound ? 'Beep on' : 'Muted'}
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <ProductPicker ref={picker} onAdd={addProduct} cartQty={cartQty} refreshKey={refreshKey} />
+        </div>
+      </div>
 
       <div className="flex min-h-0 flex-col rounded-lg border border-border bg-card" aria-label="Current bill">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">

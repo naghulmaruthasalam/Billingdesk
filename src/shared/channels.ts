@@ -44,6 +44,7 @@ export const CORE_CHANNELS = [
   'purchases:create',
   'billing:create',
   'invoice:html',
+  'labels:html',
   'sales:list',
   'sales:get',
   'sales:findByNo',
@@ -81,6 +82,7 @@ export const NATIVE_CHANNELS = [
   'dialog:chooseBackupFile',
   'print:invoice',
   'print:test',
+  'print:labels',
   'app:info',
   'app:showDataFolder',
 ] as const;

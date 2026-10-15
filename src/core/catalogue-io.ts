@@ -6,6 +6,7 @@ import { audit } from './audit';
 import { csvToObjects, parseCsv, toCsv } from './csv';
 import { isoNow } from './time';
 import { paiseToDecimal, parseRupees } from '../shared/money';
+import { allocateBarcode, normalizeBarcodeInput } from './barcodes';
 
 export const CATALOGUE_COLUMNS = ['sku', 'barcode', 'name_en', 'name_ta', 'category', 'unit', 'price', 'cost', 'min_stock', 'discount_rule', 'active', 'notes', 'printed_no', 'printed_price', 'review_status'] as const;
 
@@ -128,7 +129,12 @@ export function previewCatalogueCsv(db: Db, text: string): ImportPreview {
       else if (no(r.active)) active = false;
       else err(`Active must be yes or no (got "${r.active}")`);
     }
-    const barcode = norm(r.barcode ?? '') || null;
+    let barcode: string | null = null;
+    try {
+      barcode = normalizeBarcodeInput(r.barcode);
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Invalid barcode');
+    }
     if (barcode) {
       if (seenBarcode.has(barcode)) err(`Duplicate barcode "${barcode}" in this file`);
       seenBarcode.add(barcode);
@@ -240,13 +246,13 @@ export function commitCatalogueCsv(ctx: Ctx, text: string, opts: { acceptWarning
         const sort = (ctx.db.prepare('SELECT COALESCE(MAX(sort_order),0)+1 s FROM products').get() as { s: number }).s;
         ctx.db
           .prepare('INSERT INTO products (sku, barcode, name_en, name_ta, category_id, unit, price_paise, cost_paise, stock_qty, min_stock, discount_rule, active, notes, sort_order, review_status, review_reason, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?)')
-          .run(r.sku, r.barcode, r.nameEn, r.nameTa, cid, r.unit, r.pricePaise, r.costPaise, r.minStock, r.discountRule, r.active ? 1 : 0, r.notes, sort, reviewStatus, reason, ts, ts);
+          .run(r.sku, r.barcode ?? allocateBarcode(ctx.db), r.nameEn, r.nameTa, cid, r.unit, r.pricePaise, r.costPaise, r.minStock, r.discountRule, r.active ? 1 : 0, r.notes, sort, reviewStatus, reason, ts, ts);
         created++;
       } else {
         const cur = ctx.db.prepare('SELECT id, price_paise, cost_paise, review_status FROM products WHERE sku = ? COLLATE NOCASE').get(r.sku) as { id: number; price_paise: number | null; cost_paise: number | null; review_status: string };
         ctx.db
-          .prepare('UPDATE products SET name_en=?, name_ta=?, category_id=?, unit=?, price_paise=?, cost_paise=CASE WHEN ? THEN ? ELSE cost_paise END, min_stock=CASE WHEN ? THEN ? ELSE min_stock END, discount_rule=CASE WHEN ? THEN ? ELSE discount_rule END, active=CASE WHEN ? THEN ? ELSE active END, barcode=CASE WHEN ? THEN ? ELSE barcode END, review_status=?, review_reason=?, updated_at=? WHERE id=?')
-          .run(r.nameEn, r.nameTa, cid, r.unit, r.pricePaise, headers.includes('cost') ? 1 : 0, r.costPaise, headers.includes('min_stock') ? 1 : 0, r.minStock, headers.includes('discount_rule') ? 1 : 0, r.discountRule, headers.includes('active') ? 1 : 0, r.active ? 1 : 0, headers.includes('barcode') ? 1 : 0, r.barcode, reviewStatus, reason, ts, cur.id);
+          .prepare('UPDATE products SET name_en=?, name_ta=?, category_id=?, unit=?, price_paise=?, cost_paise=CASE WHEN ? THEN ? ELSE cost_paise END, min_stock=CASE WHEN ? THEN ? ELSE min_stock END, discount_rule=CASE WHEN ? THEN ? ELSE discount_rule END, active=CASE WHEN ? THEN ? ELSE active END, barcode=CASE WHEN ? AND ? IS NOT NULL THEN ? ELSE barcode END, review_status=?, review_reason=?, updated_at=? WHERE id=?')
+          .run(r.nameEn, r.nameTa, cid, r.unit, r.pricePaise, headers.includes('cost') ? 1 : 0, r.costPaise, headers.includes('min_stock') ? 1 : 0, r.minStock, headers.includes('discount_rule') ? 1 : 0, r.discountRule, headers.includes('active') ? 1 : 0, r.active ? 1 : 0, headers.includes('barcode') ? 1 : 0, r.barcode, r.barcode, reviewStatus, reason, ts, cur.id);
         const priceChange = r.changes.find((c) => c.field === 'price');
         if (priceChange) audit(ctx, { action: 'product.price_change', entity: 'products', entityId: cur.id, details: { from: cur.price_paise, to: r.pricePaise, via: 'import' } });
         updated++;

@@ -1,3 +1,4 @@
+/* global window, document -- used inside page.evaluate callbacks, which run in the browser */
 // End-to-end acceptance run against the real Electron app (built output in dist/ and dist-electron/).
 //   Linux:   xvfb-run -a node scripts/e2e.mjs        (needs: npm run build first - `npm run test:e2e` does both)
 //   Windows: node scripts/e2e.mjs
@@ -44,6 +45,18 @@ async function launch() {
 }
 
 const hasTool = (cmd) => spawnSync(cmd, ['-v'], { stdio: 'ignore' }).error?.code !== 'ENOENT';
+const barcodeOf = (sku) => page.evaluate(async (q) => (await window.skb.invoke('products:list', { search: q })).data.rows.find((r) => r.sku === q).barcode, sku);
+/** Rasterise a PDF and decode every EAN-13 in it with zbar (an independent barcode decoder), if available. */
+function decodePdf(pdf, prefix) {
+  if (!hasTool('pdftoppm') || !hasTool('zbarimg')) return null;
+  execFileSync('pdftoppm', ['-png', '-r', '200', pdf, prefix]);
+  const found = [];
+  for (const f of readdirSync(out).filter((n) => n.startsWith(prefix.split(/[\\/]/).pop()) && n.endsWith('.png')).sort()) {
+    const r = spawnSync('zbarimg', ['-q', '--raw', '-Sdisable', '-Sean13.enable', join(out, f)], { encoding: 'utf8' });
+    found.push(...(r.stdout ?? '').split(/\r?\n/).filter((l) => /^\d{13}$/.test(l)));
+  }
+  return found;
+}
 const money = (s) => Number(s.replace(/[^\d.]/g, ''));
 let { app, page } = await launch();
 
@@ -109,6 +122,34 @@ try {
     await page.getByLabel('Filter products').fill('');
     await page.getByRole('button', { name: /Save 4 opening balances/ }).click();
     await page.getByText('4 opening balances saved').waitFor();
+  });
+
+  await step('barcode scanner: a scan adds the product wherever the cursor is, unknown codes are rejected', async () => {
+    await page.getByRole('link', { name: 'New Bill' }).click();
+    const code = await barcodeOf('SK-043');
+    assert.match(code, /^2\d{12}$/);
+    await page.getByLabel('Customer name').click();
+    await page.keyboard.type(code, { delay: 4 }); // scanner speed: a key every few ms
+    await page.keyboard.press('Enter');
+    await page.getByTestId('cart-line').filter({ hasText: 'Hydrogen Bomb' }).waitFor();
+    assert.equal(await page.getByLabel('Customer name').inputValue(), '', 'scan characters must not stay in the focused field');
+    await page.getByTestId('scan-status').filter({ hasText: 'Hydrogen Bomb added' }).waitFor();
+    await page.keyboard.type(code, { delay: 4 }); // scanning again increments the quantity
+    await page.keyboard.press('Enter');
+    await page.getByLabel('Quantity of Hydrogen Bomb').waitFor();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Quantity of Hydrogen Bomb"]').value === '2');
+    await page.keyboard.type('2999999999994', { delay: 4 });
+    await page.keyboard.press('Enter');
+    await page.getByTestId('scan-status').filter({ hasText: 'Unknown barcode 2999999999994' }).waitFor();
+    assert.equal(await page.getByTestId('cart-line').count(), 1);
+    // a person typing slowly into the search box is NOT treated as a scan
+    await page.getByLabel('Search products').click();
+    await page.keyboard.type('classic', { delay: 160 });
+    assert.equal(await page.getByLabel('Search products').inputValue(), 'classic');
+    await page.getByLabel('Search products').fill('');
+    await shot(page, '04a-scan');
+    await page.getByRole('button', { name: 'Clear' }).click();
+    await page.getByRole('button', { name: 'Clear bill' }).click();
   });
 
   let invoiceNo;
@@ -230,6 +271,48 @@ try {
     await page.getByText(/Return RET-00001 of SKP-000001/).waitFor();
     await page.getByText(/Cancelled SKP-000002: Test cancellation/).waitFor();
     await shot(page, '11a-stock-movements');
+  });
+
+  await step('barcode labels: print to PDF and decode the bars with an independent scanner', async () => {
+    await page.getByRole('link', { name: 'Products' }).click();
+    await page.getByRole('tab', { name: 'Barcode labels' }).click();
+    const codes = [await barcodeOf('SK-043'), await barcodeOf('SK-045')];
+    for (const [query, product] of [['hydrogen', 'Hydrogen Bomb'], ['classic bomb', 'Classic Bomb']]) {
+      await page.getByLabel('Search products for labels').fill(query);
+      await page.getByRole('checkbox', { name: `Select ${product}` }).check(); // waits for the filtered row
+    }
+    await page.getByText(/2 labels on 2 roll labels/).waitFor();
+    await shot(page, '07a-labels-thermal');
+    const pdf = join(out, 'labels-thermal.pdf');
+    rmSync(pdf, { force: true });
+    await app.evaluate(({ dialog }, p) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: p }); }, pdf);
+    await page.getByRole('button', { name: 'Save as PDF' }).click();
+    for (let i = 0; i < 40 && !existsSync(pdf); i++) await page.waitForTimeout(250);
+    assert.ok(existsSync(pdf), 'label PDF was not written');
+    if (hasTool('pdfinfo')) {
+      const info = execFileSync('pdfinfo', [pdf], { encoding: 'utf8' });
+      assert.match(info, /Pages:\s+2/);
+      const [w, h] = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(info).slice(1).map(Number);
+      assert.ok(Math.abs(w - 141.73) < 1.5 && Math.abs(h - 85.04) < 1.5, `expected 50 x 30 mm pages (141.7 x 85.0 pt), got ${w} x ${h}`);
+    }
+    const thermal = decodePdf(pdf, join(out, 'labels-thermal'));
+    if (thermal) assert.deepEqual(thermal.sort(), [...codes].sort(), 'decoded barcodes differ from the products');
+    else console.log('    (zbar not installed: barcode decode skipped)');
+
+    // A4 sticker sheet starting at label 3 (re-using a part-used sheet)
+    await page.getByLabel('Label type').selectOption({ label: 'A4 sticker sheet 3 × 8 (24 labels)' });
+    await page.getByLabel('Start at label no.').fill('3');
+    await page.getByText(/2 labels on 1 sheet/).waitFor();
+    await shot(page, '07b-labels-a4');
+    const pdf2 = join(out, 'labels-a4.pdf');
+    rmSync(pdf2, { force: true });
+    await app.evaluate(({ dialog }, p) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: p }); }, pdf2);
+    await page.getByRole('button', { name: 'Save as PDF' }).click();
+    for (let i = 0; i < 40 && !existsSync(pdf2); i++) await page.waitForTimeout(250);
+    assert.ok(existsSync(pdf2), 'A4 label PDF was not written');
+    if (hasTool('pdfinfo')) assert.match(execFileSync('pdfinfo', [pdf2], { encoding: 'utf8' }), /Pages:\s+1/);
+    const a4 = decodePdf(pdf2, join(out, 'labels-a4'));
+    if (a4) assert.deepEqual(a4.sort(), [...codes].sort());
   });
 
   await step('dashboard totals and reports', async () => {

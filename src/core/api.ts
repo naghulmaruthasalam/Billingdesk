@@ -24,6 +24,8 @@ import { toXlsx } from './xlsx';
 import { businessDate, isDateString } from './time';
 import { renderInvoiceHtml, type PrintableInvoice, type PrintableShop, type ReceiptSize } from '../shared/invoiceHtml';
 import { requirePermission, can } from './authz';
+import { labelLayoutSchema } from './settings';
+import { renderLabelsHtml, type LabelItem, type LabelsResult } from '../shared/labelHtml';
 
 export type ApiResult<T = unknown> = { ok: true; data: T } | { ok: false; error: { code: string; message: string; details?: unknown } };
 
@@ -38,6 +40,15 @@ interface Handler {
 const id = z.object({ id: z.number().int().positive() });
 const dateRange = z.object({ from: z.string().refine(isDateString).optional(), to: z.string().refine(isDateString).optional() });
 const page = { limit: z.number().int().min(1).max(5000).optional(), offset: z.number().int().min(0).optional() };
+
+export const labelsRequestSchema = z.object({
+  items: z.array(z.object({ productId: z.number().int().positive(), copies: z.number().int().min(1).max(500) })).min(1).max(500),
+  /** Leave the first N cells of an A4 sheet empty (re-using a partly used sticker sheet). */
+  startAt: z.number().int().min(0).max(200).optional(),
+  /** Layout for this run; defaults to the saved shop layout. */
+  layout: labelLayoutSchema.optional(),
+});
+export type LabelsRequest = z.infer<typeof labelsRequestSchema>;
 
 const stripCost = (ctx: Ctx, p: products.ProductDTO): products.ProductDTO => (can(ctx, 'products.edit') || can(ctx, 'inventory.adjust') || can(ctx, 'purchases.manage') ? p : { ...p, costPaise: null });
 
@@ -186,6 +197,14 @@ const HANDLERS: Record<string, Handler> = {
     schema: z.object({ id: z.number().int().positive(), size: z.enum(['58mm', '80mm', 'a4']).optional() }),
     run: (rt, i, ctx) => ({ html: buildInvoiceHtml(rt, ctx!, i.id, i.size, './fonts') }),
   },
+  'labels:html': {
+    access: 'products.view',
+    schema: labelsRequestSchema,
+    run: (rt, i) => {
+      const r = buildLabelsHtml(rt, i, './fonts');
+      return { html: r.html, labels: r.labels, pages: r.pages, skipped: r.skipped, moduleMm: r.moduleMm, geometry: r.geometry };
+    },
+  },
   'sales:list': {
     access: 'sales.view',
     schema: z.object({ ...dateRange.shape, invoiceNo: z.string().max(40).optional(), productId: z.number().int().optional(), cashierId: z.number().int().optional(), paymentMode: z.enum(['cash', 'upi', 'card']).optional(), customer: z.string().max(80).optional(), status: z.enum(['completed', 'cancelled']).optional(), ...page }),
@@ -256,6 +275,29 @@ const HANDLERS: Record<string, Handler> = {
     run: () => ({ filename: 'catalogue-template.csv', mime: 'text/csv', text: toCsv([['sku', 'barcode', 'name_en', 'name_ta', 'category', 'unit', 'price', 'cost', 'min_stock', 'discount_rule', 'active', 'notes'], ['', '', 'Example Product', 'எடுத்துக்காட்டு', 'Fancy Items', 'Box', '100.00', '', '0', 'inherit', 'yes', '']]) }),
   },
 };
+
+
+/** Build barcode-label HTML for the requested products. Shared by the in-app preview and the native print path. */
+export function buildLabelsHtml(rt: Runtime, req: LabelsRequest, fontBase: string): LabelsResult & { requested: number } {
+  const layout = req.layout ?? settings.getSetting(rt.db, 'labels.layout');
+  const get = rt.db.prepare('SELECT sku, name_en, name_ta, unit, price_paise, barcode FROM products WHERE id = ?');
+  const items: LabelItem[] = [];
+  let requested = 0;
+  for (const it of req.items) {
+    const r = get.get(it.productId) as { sku: string; name_en: string; name_ta: string; unit: string; price_paise: number | null; barcode: string | null } | undefined;
+    if (!r) throw new AppError('NOT_FOUND', `Product ${it.productId} not found`);
+    requested += it.copies;
+    if (requested > 5000) throw new AppError('VALIDATION', 'At most 5000 labels can be printed in one run');
+    for (let i = 0; i < it.copies; i++) items.push({ sku: r.sku, nameEn: r.name_en, nameTa: r.name_ta, unit: r.unit, pricePaise: r.price_paise, barcode: r.barcode });
+  }
+  const res = renderLabelsHtml(items, settings.getSetting(rt.db, 'shop.name_en'), layout, { fontBase, startAt: req.startAt });
+  return { ...res, requested };
+}
+
+/** Record that labels were sent to the printer or saved as PDF. */
+export function recordLabelPrint(ctx: Ctx, labels: number, mode: 'print' | 'pdf'): void {
+  audit(ctx, { action: 'labels.print', entity: 'products', details: { labels, mode } });
+}
 
 /** Record that an invoice was sent to the printer or saved as PDF (drives the DUPLICATE COPY marker on reprints). */
 export function recordInvoicePrint(ctx: Ctx, invoiceId: number, mode: 'print' | 'pdf'): void {

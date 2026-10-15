@@ -8,6 +8,7 @@ import { isoNow } from './time';
 import { getSetting, putSetting } from './settings';
 import { resolveDiscountBp, type DiscountRule } from '../shared/pricing';
 import { recordMovement, lowStockCondition } from './inventory';
+import { allocateBarcode, normalizeBarcodeInput } from './barcodes';
 
 export interface ProductDTO {
   id: number;
@@ -152,13 +153,13 @@ export function getProduct(db: Db, id: number): ProductDTO {
 }
 
 export function findByBarcodeOrSku(db: Db, code: string): ProductDTO | null {
-  const r = db.prepare(`${SELECT_PRODUCT} WHERE (p.barcode = ? OR p.sku = ? COLLATE NOCASE) AND p.active = 1`).get(code, code) as ProductRow | undefined;
+  const r = db.prepare(`${SELECT_PRODUCT} WHERE (p.barcode = ? OR p.sku = ? COLLATE NOCASE)`).get(code, code) as ProductRow | undefined;
   return r ? toDTO(r, getSetting(db, 'discount.default_bp')) : null;
 }
 
 export const productInputSchema = z.object({
   sku: z.string().trim().max(40).optional(),
-  barcode: z.string().trim().max(60).nullable().optional(),
+  barcode: z.string().trim().max(60).nullable().optional().transform((v) => normalizeBarcodeInput(v)),
   nameEn: z.string().trim().min(1, 'English name is required').max(160),
   nameTa: z.string().trim().max(160).default(''),
   categoryId: z.number().int().positive(),
@@ -196,7 +197,7 @@ export function createProduct(ctx: Ctx, input: ProductInput): ProductDTO {
       id = Number(
         ctx.db
           .prepare('INSERT INTO products (sku, barcode, name_en, name_ta, category_id, unit, price_paise, cost_paise, stock_qty, min_stock, discount_rule, active, notes, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?)')
-          .run(sku, p.barcode || null, p.nameEn, p.nameTa, p.categoryId, p.unit, p.pricePaise, p.costPaise ?? null, p.minStock, p.discountRule, p.active ? 1 : 0, p.notes ?? null, sort, now, now).lastInsertRowid,
+          .run(sku, p.barcode || allocateBarcode(ctx.db), p.nameEn, p.nameTa, p.categoryId, p.unit, p.pricePaise, p.costPaise ?? null, p.minStock, p.discountRule, p.active ? 1 : 0, p.notes ?? null, sort, now, now).lastInsertRowid,
       );
     } catch (e) {
       wrapUnique(e);
@@ -216,7 +217,7 @@ export function updateProduct(ctx: Ctx, id: number, input: Omit<ProductInput, 'o
     try {
       ctx.db
         .prepare('UPDATE products SET sku=?, barcode=?, name_en=?, name_ta=?, category_id=?, unit=?, price_paise=?, cost_paise=?, min_stock=?, discount_rule=?, active=?, notes=?, updated_at=? WHERE id=?')
-        .run(p.sku || before.sku, p.barcode || null, p.nameEn, p.nameTa, p.categoryId, p.unit, p.pricePaise, p.costPaise ?? null, p.minStock, p.discountRule, p.active ? 1 : 0, p.notes ?? null, isoNow(ctx.now()), id);
+        .run(p.sku || before.sku, p.barcode || before.barcode || allocateBarcode(ctx.db), p.nameEn, p.nameTa, p.categoryId, p.unit, p.pricePaise, p.costPaise ?? null, p.minStock, p.discountRule, p.active ? 1 : 0, p.notes ?? null, isoNow(ctx.now()), id);
     } catch (e) {
       wrapUnique(e);
     }
@@ -234,6 +235,7 @@ export function updateProduct(ctx: Ctx, id: number, input: Omit<ProductInput, 'o
     cmp('categoryId', before.categoryId, p.categoryId);
     cmp('sku', before.sku, p.sku || before.sku);
     cmp('minStock', before.minStock, p.minStock);
+    cmp('barcode', before.barcode, p.barcode || before.barcode);
     if (Object.keys(changes).length) {
       audit(ctx, { action: 'pricePaise' in changes ? 'product.price_change' : 'product.update', entity: 'products', entityId: id, details: changes });
     }

@@ -13,6 +13,7 @@ import { ProductEditDialog } from './ProductEditDialog';
 import { ReviewTab } from './ReviewTab';
 import { ImportTab } from './ImportTab';
 import { CategoriesTab } from './CategoriesTab';
+import { LabelsTab } from './LabelsTab';
 
 export function ProductsPage() {
   const { can } = useAuth();
@@ -52,6 +53,7 @@ export function ProductsPage() {
         <TabsList>
           <TabsTrigger value="products">Product master</TabsTrigger>
           <TabsTrigger value="categories">Categories & discount rules</TabsTrigger>
+          <TabsTrigger value="labels">Barcode labels</TabsTrigger>
           <TabsTrigger value="review">Catalogue review</TabsTrigger>
           {can('products.import') && <TabsTrigger value="import">Import / export</TabsTrigger>}
         </TabsList>
@@ -91,6 +93,7 @@ export function ProductsPage() {
                 <tr>
                   <Th>#</Th>
                   <Th>SKU</Th>
+                  <Th>Barcode</Th>
                   <Th>Product</Th>
                   <Th>Category</Th>
                   <Th>Unit</Th>
@@ -105,6 +108,7 @@ export function ProductsPage() {
                   <tr key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => can('products.edit') && setEditing(p)}>
                     <Td num className="text-muted-foreground">{p.printedNo ?? ''}</Td>
                     <Td className="whitespace-nowrap text-xs">{p.sku}</Td>
+                    <Td className="num !text-left font-mono text-xs">{p.barcode}</Td>
                     <Td>
                       <div className="font-medium">{p.nameEn}</div>
                       <div className="ta text-xs text-muted-foreground">{p.nameTa}</div>
@@ -128,6 +132,9 @@ export function ProductsPage() {
         </TabsContent>
         <TabsContent value="categories">
           <CategoriesTab onChanged={reloadAll} />
+        </TabsContent>
+        <TabsContent value="labels">
+          <LabelsTab />
         </TabsContent>
         <TabsContent value="review">
           <ReviewTab key={version} onEdit={setEditing} onChanged={reloadAll} />

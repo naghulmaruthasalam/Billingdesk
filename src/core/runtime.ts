@@ -6,6 +6,7 @@ import type { Ctx, SessionUser } from './types';
 import { AppError } from './errors';
 import { buildSessionUser } from './auth';
 import { ensureSeeded } from './seed';
+import { ensureBarcodes } from './barcodes';
 import { auditSystem } from './audit';
 import { createBackup, inspectBackup, integrityCheck, pruneBackups, replaceDatabaseFile, type BackupInfo } from './backup';
 import { getSetting, putSetting } from './settings';
@@ -57,6 +58,7 @@ export class Runtime {
       },
     });
     ensureSeeded(this.db, now);
+    ensureBarcodes(this.db, now);
   }
 
   close(): void {

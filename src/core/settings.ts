@@ -4,6 +4,21 @@ import type { Ctx } from './types';
 import { audit } from './audit';
 import { isoNow } from './time';
 import { AppError } from './errors';
+import { DEFAULT_LABEL_LAYOUT } from '../shared/labelHtml';
+
+export const labelLayoutSchema = z.object({
+  kind: z.enum(['thermal', 'a4']),
+  widthMm: z.number().min(20).max(120),
+  heightMm: z.number().min(15).max(100),
+  cols: z.number().int().min(1).max(8),
+  rows: z.number().int().min(1).max(20),
+  marginTopMm: z.number().min(0).max(30),
+  marginLeftMm: z.number().min(0).max(30),
+  gapMm: z.number().min(0).max(10),
+  showPrice: z.boolean(),
+  showTamil: z.boolean(),
+  showShop: z.boolean(),
+});
 
 /** Every setting with its type, default and validation. Stored as JSON text in the `settings` table. */
 export const SETTINGS_SCHEMA = {
@@ -36,6 +51,7 @@ export const SETTINGS_SCHEMA = {
   'backup.directory': z.string().max(500),
   'backup.last_auto_date': z.string().max(10),
   'ui.theme': z.enum(['light', 'dark', 'system']),
+  'labels.layout': labelLayoutSchema,
   'auth.recovery_hash': z.string().max(200),
   'catalogue.seeded': z.boolean(),
 } as const;
@@ -74,6 +90,7 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'backup.directory': '',
   'backup.last_auto_date': '',
   'ui.theme': 'light',
+  'labels.layout': DEFAULT_LABEL_LAYOUT,
   'auth.recovery_hash': '',
   'catalogue.seeded': false,
 };

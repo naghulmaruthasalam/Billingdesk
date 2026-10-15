@@ -48,7 +48,7 @@ On Linux as `root` (containers/CI) the dev script adds `--no-sandbox` automatica
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` for app and tool configs |
 | `npm test` | Vitest unit/integration tests (real SQLite, no mocks of the database) |
-| `npm run test:e2e` | Build, then drive the real Electron app with Playwright (needs a display; on Linux use `xvfb-run -a npm run test:e2e`; `poppler-utils` enables PDF text/font checks) |
+| `npm run test:e2e` | Build, then drive the real Electron app with Playwright (needs a display; on Linux use `xvfb-run -a npm run test:e2e`; `poppler-utils` enables PDF text/font checks and `zbar-tools` the barcode-decode checks) |
 | `npm run pack` | Unpacked app in `release/<platform>-unpacked` (quick packaging check) |
 | `npm run dist:win` | Windows NSIS installer → `release/SriKrishnaBilling-Setup-<version>-win-x64.exe` |
 | `npm run dist:rpm` | Fedora RPM → `release/sri-krishna-billing-<version>.x86_64.rpm` |
@@ -129,6 +129,19 @@ Inside: `data/skbilling.sqlite` (WAL mode, `synchronous=FULL`), `backups/`, `log
 * Settings → Backup & restore also offers an on-demand integrity check, catalogue CSV export and business settings export.
 * Copy backups to a USB drive regularly; a backup on the same disk does not protect against disk failure.
 
+## Barcodes, scanners and label printers
+
+* **Every product has a barcode.** A unique, shop-internal **EAN-13** (digits only, prefix `2` = the retail "in-store" range, correct check digit) is created automatically for all 114 catalogue products, for every product you add or import later, and - on start-up - for any product in an older database that lacks one. A barcode is **never changed** by editing a product, so printed labels stay valid forever. If a carton already carries a manufacturer EAN-13 you can type it into the product instead (the check digit is verified; scanning works with any code, but only EAN-13 can be drawn on a label).
+* **Barcode scanner (the "reader")**: any USB or Bluetooth scanner in its default *HID keyboard* mode works - no driver, no setup. Make sure it adds **Enter** after each scan (the factory default). At **New Bill**, a scan adds the product (a second scan adds one more) **whatever field has the cursor**: the app recognises scanner-speed typing, removes the stray digits from the field, and beeps (high = added, low = unknown/inactive/no price; mute with the speaker button). A scan after a completed sale starts the next bill. Slow human typing is never mistaken for a scan. Scanning a code into the search box on Products, Inventory or Purchases finds the product too.
+* **Label printing**: *Products → Barcode labels*. Pick products and copies (or *Copies = stock* after receiving goods), choose a label type, preview, then **Print** or **Save as PDF**.
+  * Roll labels 50×30, 40×30, 60×40 mm or any custom size - one label per page at the exact size.
+  * A4 sticker sheets (3×8, 4×10, 3×7 or custom columns/rows/margins) with **Start at label no.** to re-use a part-used sheet.
+  * Each label: shop name, English and Tamil name, price per unit, bars and digits. The preview shows the printed bar width and warns when it is too thin for reliable scanning (below 0.25 mm).
+  * *Save as shop default* stores the layout for everyone.
+  * A single label can also be printed from the product's edit dialog.
+* **Printers**: labels go through the operating system's print system, like receipts. Install the label printer's driver, set its paper to the same size as the label (margins zero) and choose the printer in the print window. Direct raw printer languages (ZPL/TSPL/ESC-POS) are not used.
+* **Verified**: unit tests check the EAN-13 encoder against published codes; the end-to-end run prints labels to PDF (roll and A4) and **decodes the bars with the independent `zbar` decoder**, requiring the decoded numbers to equal the products' barcodes; and it types a barcode at scanner speed into the customer-name field of the real app.
+
 ## Building packages
 
 Build each package on (or for) its platform. The commands below were run in this repository's development environment (Ubuntu 24.04, with `rpm` and `wine` installed for cross-building); see [Limitations](#limitations) for what was and was not verified on real Windows/Fedora.
@@ -145,7 +158,7 @@ Install on Fedora: `sudo dnf install ./sri-krishna-billing-1.0.0.x86_64.rpm` (in
 
 ## Testing
 
-`npm test` runs ~110 tests against real in-memory/on-disk SQLite databases: pricing and rounding, discount eligibility, cash change, split payments, invoice numbering, stock deduction, insufficient stock, transaction rollback, idempotency, returns/refunds, cancellation audit trail, search (English, Tamil, SKU, serial, wildcards), CSV import preview, backup (including WAL-only data, corruption, restore + rollback), migrations (v1 → latest with data, failure rollback, newer-schema refusal), role permissions (every channel signed-out, cashier/inventory/owner, supervisor approval), invoice HTML/Tamil/paper sizes, print gating.
+`npm test` runs ~120 tests against real in-memory/on-disk SQLite databases: pricing and rounding, discount eligibility, cash change, split payments, invoice numbering, stock deduction, insufficient stock, transaction rollback, idempotency, returns/refunds, cancellation audit trail, search (English, Tamil, SKU, serial, wildcards), CSV import preview, backup (including WAL-only data, corruption, restore + rollback), migrations (v1 → latest with data, failure rollback, newer-schema refusal), role permissions (every channel signed-out, cashier/inventory/owner, supervisor approval), invoice HTML/Tamil/paper sizes, print gating.
 
 `npm run test:e2e` drives the built app like a user: setup → catalogue review/approval → address confirmation → opening stock → multi-item bill with discounts and cash change → **Save as PDF with Tamil verified in the PDF text and embedded Noto Sans Tamil fonts** → UPI sale → history/return/cancellation → stock correctness → dashboard/reports → backup → restore → offline check (a `fetch` to the internet is blocked) → restart persistence.
 
@@ -182,7 +195,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for operational problems. Known lim
 * Single computer: there is no multi-terminal sync. Two cashier PCs would need separate databases.
 * Stock is whole-number units (Box/Pkt/Pc); fractional quantities are not supported.
 * Tax is a single invoice-level rate; per-item tax slabs, HSN codes and GST-format invoices are not implemented. Confirm the shop's actual requirements with its accountant.
-* Customer-facing display, loyalty, parked bills and barcode label printing are not implemented.
+* Customer-facing display, loyalty and parked bills are not implemented. There is no camera or OCR input: scanning needs a hardware barcode scanner. Invoice numbers are not printed as barcodes yet (the Returns page accepts a typed or scanned invoice number as text).
 * Dark theme is provided; the print output is always light.
 
 ## Licences

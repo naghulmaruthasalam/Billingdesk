@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { Runtime } from '../core/runtime';
 import { AppError } from '../core/errors';
-import { buildInvoiceHtml, recordInvoicePrint, shopForPrint } from '../core/api';
+import { buildInvoiceHtml, buildLabelsHtml, labelsRequestSchema, recordInvoicePrint, recordLabelPrint, shopForPrint } from '../core/api';
 import { LATEST_SCHEMA_VERSION } from '../core/db/schema';
 import { currentSchemaVersion } from '../core/db/connection';
 import { getSetting } from '../core/settings';
@@ -33,7 +33,17 @@ function requireSignedIn(rt: Runtime): void {
 const filtersSchema = z.array(z.object({ name: z.string().max(40), extensions: z.array(z.string().regex(/^[A-Za-z0-9]{1,8}$/)).max(6) })).max(4).optional();
 
 /** Print a standalone HTML document through a hidden, sandboxed window. */
-async function printHtml(state: NativeState, html: string, size: ReceiptSize, mode: 'print' | 'pdf', suggestedName: string): Promise<Result> {
+type PrintPage =
+  | { kind: 'receipt'; size: ReceiptSize }
+  /** Exact page size in micrometres, zero margins (barcode labels: position matters). */
+  | { kind: 'exact'; widthMicrons: number; heightMicrons: number }
+  /** A4 with zero margins; the document positions everything itself (A4 sticker sheets). */
+  | { kind: 'a4-exact' };
+
+async function printHtml(state: NativeState, html: string, page: PrintPage | ReceiptSize, mode: 'print' | 'pdf', suggestedName: string): Promise<Result> {
+  const pg: PrintPage = typeof page === 'string' ? { kind: 'receipt', size: page } : page;
+  const a4 = (pg.kind === 'receipt' && pg.size === 'a4') || pg.kind === 'a4-exact';
+  const zeroMargins = pg.kind !== 'receipt' || pg.size !== 'a4';
   mkdirSync(tempDir(), { recursive: true });
   const file = join(tempDir(), `print-${process.pid}-${Date.now()}.html`);
   writeFileSync(file, html, 'utf8');
@@ -46,17 +56,19 @@ async function printHtml(state: NativeState, html: string, size: ReceiptSize, mo
     const wc: WebContents = win.webContents;
     await wc.executeJavaScript('document.fonts ? document.fonts.ready.then(() => true) : true');
     const pageSize =
-      size === 'a4'
-        ? ('A4' as const)
-        : {
-            width: PAPER_WIDTH_MICRONS[size],
-            // measured content height (CSS px -> microns at 96 dpi) plus a small trailing margin
-            height: Math.max(40000, Math.ceil(((await wc.executeJavaScript('document.documentElement.scrollHeight')) as number) * 264.583) + 8000),
-          };
+      pg.kind === 'exact'
+        ? { width: pg.widthMicrons, height: pg.heightMicrons }
+        : a4
+          ? ('A4' as const)
+          : {
+              width: PAPER_WIDTH_MICRONS[(pg as { size: ReceiptSize }).size],
+              // measured content height (CSS px -> microns at 96 dpi) plus a small trailing margin
+              height: Math.max(40000, Math.ceil(((await wc.executeJavaScript('document.documentElement.scrollHeight')) as number) * 264.583) + 8000),
+            };
     if (mode === 'pdf') {
       // printToPDF takes custom sizes in inches; webContents.print takes microns.
       const pdfSize = typeof pageSize === 'string' ? pageSize : { width: pageSize.width / 25400, height: pageSize.height / 25400 };
-      const data = await wc.printToPDF({ pageSize: pdfSize, printBackground: true, margins: size === 'a4' ? undefined : { top: 0, bottom: 0, left: 0, right: 0 } });
+      const data = await wc.printToPDF({ pageSize: pdfSize, printBackground: true, margins: zeroMargins ? { top: 0, bottom: 0, left: 0, right: 0 } : undefined, preferCSSPageSize: pg.kind !== 'receipt' });
       const parent = state.getWindow();
       const opts = { defaultPath: suggestedName, filters: [{ name: 'PDF', extensions: ['pdf'] }] };
       const res = parent ? await dialog.showSaveDialog(parent, opts) : await dialog.showSaveDialog(opts);
@@ -65,7 +77,7 @@ async function printHtml(state: NativeState, html: string, size: ReceiptSize, mo
       return ok({ saved: true, path: res.filePath });
     }
     return await new Promise<Result>((resolve) => {
-      wc.print({ silent: false, printBackground: true, pageSize, margins: size === 'a4' ? undefined : { marginType: 'none' } }, (success, reason) => {
+      wc.print({ silent: false, printBackground: true, pageSize, margins: zeroMargins ? { marginType: 'none' } : undefined }, (success, reason) => {
         if (success) resolve(ok({ printed: true }));
         else if (/cancel/i.test(reason ?? '')) resolve(ok({ printed: false, cancelled: true }));
         else resolve(err('INTERNAL', `Printing failed: ${reason || 'unknown reason'}. Check that a printer is installed and online, or use Save as PDF.`));
@@ -153,6 +165,22 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };
           if (d.printed || d.saved) recordInvoicePrint(rt.ctx(), p.id, p.mode);
+        }
+        return res;
+      }
+      case 'print:labels': {
+        const u = rt.requireUser();
+        if (!u.permissions.includes('products.view')) throw new AppError('FORBIDDEN', 'You do not have permission to print labels');
+        const p = labelsRequestSchema.extend({ mode: z.enum(['print', 'pdf']) }).parse(payload);
+        const fontBase = pathToFileURL(join(state.rendererRoot, 'fonts')).toString();
+        const built = buildLabelsHtml(rt, p, fontBase);
+        if (built.labels === 0) return err('VALIDATION', 'None of the selected products has a printable barcode.');
+        const g = built.geometry;
+        const page: PrintPage = p.layout?.kind === 'a4' || (!p.layout && getSetting(rt.db, 'labels.layout').kind === 'a4') ? { kind: 'a4-exact' } : { kind: 'exact', widthMicrons: Math.round(g.pageWidthMm * 1000), heightMicrons: Math.round(g.pageHeightMm * 1000) };
+        const res = await printHtml(state, built.html, page, p.mode, 'barcode-labels.pdf');
+        if (res.ok) {
+          const d = res.data as { printed?: boolean; saved?: boolean };
+          if (d.printed || d.saved) recordLabelPrint(rt.ctx(), built.labels, p.mode);
         }
         return res;
       }

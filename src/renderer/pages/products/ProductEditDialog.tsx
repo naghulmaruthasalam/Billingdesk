@@ -7,6 +7,9 @@ import { call, errMsg } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
 import { useAuth } from '@/hooks/useAuth';
 import { formatINR, paiseToDecimal, parseRupees } from '@shared/money';
+import { ean13Svg, isValidEan13 } from '@shared/barcode';
+import { LabelPrintPanel } from '@/components/LabelPrintPanel';
+import { Printer } from 'lucide-react';
 import type { CategoryDTO, ProductDTO } from '@/lib/types';
 
 interface Form {
@@ -34,6 +37,7 @@ export function ProductEditDialog({ product, creating, categories, onClose, onSa
   const [f, setF] = useState<Form>(empty(categories[0]?.id ?? 0));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -98,6 +102,7 @@ export function ProductEditDialog({ product, creating, categories, onClose, onSa
   const policy = f.discountRule === 'never' ? 'Never discounted' : f.discountRule === 'eligible' ? 'Always discount-eligible' : cat?.discountRule === 'never' ? 'Not discounted (category rule)' : `Shop default ${(cat?.discountBp ?? settings?.['discount.default_bp'] ?? 0) / 100}%`;
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
@@ -154,9 +159,17 @@ export function ProductEditDialog({ product, creating, categories, onClose, onSa
         <Field label="SKU / product code" hint={product ? undefined : 'Leave empty to assign automatically'}>
           <Input value={f.sku} onChange={(e) => set('sku', e.target.value)} />
         </Field>
-        <Field label="Barcode (optional)">
-          <Input value={f.barcode} onChange={(e) => set('barcode', e.target.value)} />
+        <Field label="Barcode" hint={product ? 'Created automatically; leave as is. Only replace it to use a manufacturer code.' : 'Leave empty - a unique barcode is created when you save'}>
+          <Input className="font-mono" value={f.barcode} onChange={(e) => set('barcode', e.target.value)} />
         </Field>
+        {product && isValidEan13(product.barcode ?? '') && (
+          <div className="col-span-2 flex items-center gap-4 rounded-md border border-border p-2">
+            <img alt={`Barcode ${product.barcode}`} className="h-16 bg-white" src={`data:image/svg+xml;utf8,${encodeURIComponent(ean13Svg(product.barcode!, { barHeight: 30 }))}`} />
+            <Button variant="outline" size="sm" onClick={() => setLabelOpen(true)}>
+              <Printer /> Print label
+            </Button>
+          </div>
+        )}
         <Field label="Minimum stock alert">
           <Input inputMode="numeric" value={f.minStock} onChange={(e) => set('minStock', e.target.value)} />
         </Field>
@@ -184,6 +197,20 @@ export function ProductEditDialog({ product, creating, categories, onClose, onSa
           </div>
         )}
       </div>
+    </Dialog>
+    <SingleLabelDialog product={product} open={labelOpen} onClose={() => setLabelOpen(false)} />
+    </>
+  );
+}
+
+export function SingleLabelDialog({ product, open, onClose }: { product: ProductDTO | null; open: boolean; onClose: () => void }) {
+  const [copies, setCopies] = useState(1);
+  return (
+    <Dialog open={open && product !== null} onOpenChange={(o) => !o && onClose()} title={`Print label - ${product?.nameEn ?? ''}`} className="max-w-4xl" footer={<Button variant="outline" onClick={onClose}>Close</Button>}>
+      <div className="mb-3 w-32">
+        <Field label="Copies"><Input inputMode="numeric" value={copies} onChange={(e) => setCopies(Math.min(500, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1)))} /></Field>
+      </div>
+      {product && <LabelPrintPanel items={[{ productId: product.id, copies }]} previewHeight="34vh" />}
     </Dialog>
   );
 }
