@@ -142,12 +142,26 @@ Inside: `data/skbilling.sqlite` (WAL mode, `synchronous=FULL`), `backups/`, `log
 * **Printers**: labels go through the operating system's print system, like receipts. Install the label printer's driver, set its paper to the same size as the label (margins zero) and choose the printer in the print window. Direct raw printer languages (ZPL/TSPL/ESC-POS) are not used.
 * **Verified**: unit tests check the EAN-13 encoder against published codes; the end-to-end run prints labels to PDF (roll and A4) and **decodes the bars with the independent `zbar` decoder**, requiring the decoded numbers to equal the products' barcodes; and it types a barcode at scanner speed into the customer-name field of the real app.
 
+## Printers
+
+*Settings → Printers* lists the printers installed on the computer (with their status) and lets the owner choose:
+
+* the **receipt / invoice printer** and the **barcode label printer** - each can be a different device, or "Ask each time" to use the system print window;
+* **Print without the print window** - receipts and labels go straight to the chosen printer;
+* **Receipt copies** (1-5) and **Print the receipt automatically after each sale** (the sale-complete screen prints it for you, once, then you press *New bill*);
+* **Print test receipt** and **Print test label** buttons that send a clearly marked SAMPLE page / a real product label to the selected printer.
+
+If a saved printer is unplugged or uninstalled, billing is never blocked: the app falls back to the system print window and tells the cashier which printer was missing. Paper size comes from *Invoices & printing* (58 mm / 80 mm / A4) and the label layout; in the printer driver choose the same size with zero margins. Printing uses the operating system's drivers (Windows spooler, CUPS on Linux) - thermal receipt printers need a driver or a CUPS queue; raw ESC/POS and cash-drawer kick are not sent. Save-as-PDF is always available.
+
+On Linux add the printer first in *Settings → Printers* or at `http://localhost:631` (CUPS); check with `lpstat -p`. The end-to-end run sets up a real CUPS queue (`CUPS-PDF`) and verifies silent test receipt, silent test label (barcode decoded) and auto-print after a sale (`E2E_PRINTER=CUPS-PDF`).
+
 ## Building packages
 
 Build each package on (or for) its platform. The commands below were run in this repository's development environment (Ubuntu 24.04, with `rpm` and `wine` installed for cross-building); see [Limitations](#limitations) for what was and was not verified on real Windows/Fedora.
 
 ```bash
 npm ci
+bash scripts/build-fedora.sh   # one command on Fedora: installs prerequisites, builds and (optionally) installs the RPM
 npm run dist:rpm      # needs rpmbuild (dnf install rpm-build libxcrypt-compat / apt install rpm); fpm is downloaded by electron-builder
 npm run dist:win      # on Windows: no extras. On Linux: needs wine (+ wine32) for the NSIS step
 ```

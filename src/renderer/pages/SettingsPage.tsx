@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { CheckRow, Field, Input, Select } from '@/components/ui/form';
 import { Badge, Card, Kbd, Loading, Notice, PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/misc';
 import { call, errMsg } from '@/lib/api';
+import { PrintersTab } from './PrintersTab';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/toast';
 import { useAsync } from '@/hooks/useApi';
@@ -97,6 +98,7 @@ export function SettingsPage() {
         <TabsList>
           <TabsTrigger value="shop">Shop details</TabsTrigger>
           <TabsTrigger value="invoice">Invoices & printing</TabsTrigger>
+          <TabsTrigger value="printers">Printers</TabsTrigger>
           <TabsTrigger value="discount">Discount & tax</TabsTrigger>
           <TabsTrigger value="billing">Billing rules</TabsTrigger>
           <TabsTrigger value="appearance">Appearance & shortcuts</TabsTrigger>
@@ -147,6 +149,8 @@ export function SettingsPage() {
             </div>
           </div>
         </TabsContent>
+
+        <TabsContent value="printers"><PrintersTab /></TabsContent>
 
         <TabsContent value="discount">
           <div className="grid max-w-3xl grid-cols-2 gap-3">

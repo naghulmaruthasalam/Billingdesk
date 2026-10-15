@@ -41,8 +41,9 @@ export function InvoicePrintDialog({ invoiceId, invoiceNo, open, onOpenChange }:
     if (!invoiceId) return;
     setBusy(true);
     try {
-      const r = await call<{ printed?: boolean; cancelled?: boolean; saved?: boolean; path?: string }>('print:invoice', { id: invoiceId, size, mode });
-      if (r.printed) toast.success('Sent to the printer');
+      const r = await call<{ printed?: boolean; cancelled?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:invoice', { id: invoiceId, size, mode });
+      if (r.note) toast.info(r.note);
+      if (r.printed) toast.success(r.printer ? `Sent to ${r.printer}` : 'Sent to the printer');
       if (r.saved) toast.success(`Saved PDF: ${r.path}`);
     } catch (e) {
       toast.error(errMsg(e));

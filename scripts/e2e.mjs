@@ -5,7 +5,7 @@
 // Environment: E2E_OUT=<dir> for screenshots/PDF (default ./e2e-output), E2E_EXECUTABLE=<path> to test a packaged build.
 import { _electron as electron } from 'playwright-core';
 import { mkdirSync, mkdtempSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -57,6 +57,31 @@ function decodePdf(pdf, prefix) {
   }
   return found;
 }
+
+/**
+ * Poll the print queue's output folders for a file created after `since` whose name matches `nameRe`. CUPS-PDF names its
+ * output after the document title (our HTML <title>: the invoice number, or "Barcode labels"). Its Ghostscript step drops
+ * font-to-Unicode maps, so content is verified by rasterising rather than by text extraction.
+ */
+async function waitForPrinted(since, nameRe, what, timeoutMs = 30000) {
+  const dirs = [join(homedir(), 'PDF'), '/var/spool/cups-pdf/ANONYMOUS'];
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const d of dirs.filter((x) => existsSync(x))) {
+      for (const f of readdirSync(d).filter((n) => n.toLowerCase().endsWith('.pdf') && nameRe.test(n))) {
+        const full = join(d, f);
+        const st = statSync(full);
+        if (st.mtimeMs >= since && st.size > 3000) {
+          await new Promise((r) => setTimeout(r, 400)); // let the spooler finish writing
+          return { file: full };
+        }
+      }
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`${what} did not arrive at the printer within ${timeoutMs / 1000}s`);
+}
+const PRINTER = process.env.E2E_PRINTER; // name of a real system print queue, e.g. CUPS-PDF (set up by CI / the developer)
 const money = (s) => Number(s.replace(/[^\d.]/g, ''));
 let { app, page } = await launch();
 
@@ -315,6 +340,34 @@ try {
     if (a4) assert.deepEqual(a4.sort(), [...codes].sort());
   });
 
+  await step('printers: choose a real system printer, print silently (receipt test + label test)', async () => {
+    if (!PRINTER) return console.log('    (set E2E_PRINTER to a system print queue name, e.g. CUPS-PDF, to run this step)');
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('tab', { name: 'Printers' }).click();
+    await page.getByText(PRINTER, { exact: false }).first().waitFor();
+    await shot(page, '07c-printers');
+    await page.getByLabel('Receipt printer').selectOption({ value: PRINTER });
+    await page.getByLabel('Label printer', { exact: true }).selectOption({ value: PRINTER });
+    // These switches save through the backend, so their state flips after the round trip (not instantly).
+    for (const name of ['Print without the print window', 'Print the receipt automatically after each sale']) {
+      const box = page.getByRole('checkbox', { name });
+      await page.waitForFunction((n) => [...document.querySelectorAll('[role=checkbox]')].some((b) => b.closest('label')?.textContent?.includes(n) && !b.disabled), name);
+      await box.click();
+      await page.waitForFunction((n) => [...document.querySelectorAll('[role=checkbox]')].some((b) => b.closest('label')?.textContent?.includes(n) && b.getAttribute('aria-checked') === 'true'), name);
+    }
+    const t0 = Date.now() - 1000;
+    await page.getByRole('button', { name: 'Print test receipt' }).click();
+    const rc = await waitForPrinted(t0, /^TEST-000000/, 'test receipt');
+    if (hasTool('pdftoppm')) execFileSync('pdftoppm', ['-png', '-r', '90', '-singlefile', rc.file, join(out, 'printed-test-receipt')]);
+    const t1 = Date.now() - 1000;
+    await page.getByRole('button', { name: 'Print test label' }).click();
+    const lab = await waitForPrinted(t1, /^Barcode[_ ]labels/, 'test label');
+    if (hasTool('pdftoppm') && hasTool('zbarimg')) {
+      const decoded = decodePdf(lab.file, join(out, 'printed-label'));
+      assert.equal(decoded.length, 1, 'the printed label must contain one decodable barcode');
+    }
+  });
+
   await step('dashboard totals and reports', async () => {
     await page.getByRole('link', { name: 'Dashboard' }).click();
     await page.getByText('Completed bills').waitFor();
@@ -369,6 +422,24 @@ try {
     await page.getByRole('link', { name: 'Products' }).click();
     await page.getByText('114 shown').waitFor();
     await shot(page, '14-products-after-restart');
+  });
+
+  await step('auto-print: a completed sale goes straight to the chosen printer, no print window', async () => {
+    if (!PRINTER) return;
+    await page.getByRole('link', { name: 'New Bill' }).click();
+    const code = await barcodeOf('SK-043');
+    await page.getByLabel('Search products').click();
+    await page.keyboard.type(code, { delay: 4 });
+    await page.keyboard.press('Enter');
+    await page.getByTestId('cart-line').filter({ hasText: 'Hydrogen Bomb' }).waitFor();
+    const t0 = Date.now() - 1000;
+    await page.getByTestId('pay').click();
+    await page.getByTestId('complete-sale').click();
+    const no = (await page.getByTestId('invoice-no').innerText()).trim();
+    assert.equal(no, 'SKP-000003');
+    const got = await waitForPrinted(t0, new RegExp(`^${no}`), 'auto-printed receipt');
+    if (hasTool('pdftoppm')) execFileSync('pdftoppm', ['-png', '-r', '90', '-singlefile', got.file, join(out, 'printed-auto-receipt')]);
+    await page.getByTestId('new-bill').click();
   });
 
   console.log('\nAll end-to-end steps passed.');

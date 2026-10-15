@@ -83,6 +83,7 @@ export const NATIVE_CHANNELS = [
   'print:invoice',
   'print:test',
   'print:labels',
+  'printers:list',
   'app:info',
   'app:showDataFolder',
 ] as const;

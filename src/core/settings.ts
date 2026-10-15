@@ -52,6 +52,14 @@ export const SETTINGS_SCHEMA = {
   'backup.last_auto_date': z.string().max(10),
   'ui.theme': z.enum(['light', 'dark', 'system']),
   'labels.layout': labelLayoutSchema,
+  /** System printer for receipts/invoices; empty = choose in the system print window each time. */
+  'printing.receipt_printer': z.string().max(200),
+  'printing.label_printer': z.string().max(200),
+  /** Skip the print window when a printer is selected. */
+  'printing.silent': z.boolean(),
+  'printing.receipt_copies': z.number().int().min(1).max(5),
+  /** Print the receipt automatically as soon as a sale is completed. */
+  'printing.auto_print': z.boolean(),
   'auth.recovery_hash': z.string().max(200),
   'catalogue.seeded': z.boolean(),
 } as const;
@@ -91,6 +99,11 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'backup.last_auto_date': '',
   'ui.theme': 'light',
   'labels.layout': DEFAULT_LABEL_LAYOUT,
+  'printing.receipt_printer': '',
+  'printing.label_printer': '',
+  'printing.silent': false,
+  'printing.receipt_copies': 1,
+  'printing.auto_print': false,
   'auth.recovery_hash': '',
   'catalogue.seeded': false,
 };

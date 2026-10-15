@@ -40,7 +40,44 @@ type PrintPage =
   /** A4 with zero margins; the document positions everything itself (A4 sticker sheets). */
   | { kind: 'a4-exact' };
 
-async function printHtml(state: NativeState, html: string, page: PrintPage | ReceiptSize, mode: 'print' | 'pdf', suggestedName: string): Promise<Result> {
+export interface PrintTarget {
+  /** System printer name; undefined = use the system print window. */
+  deviceName?: string;
+  /** Print without showing the system dialog (only when deviceName is set). */
+  silent: boolean;
+  copies: number;
+}
+
+export interface PrinterInfo {
+  name: string;
+  displayName: string;
+  description: string;
+  isDefault: boolean;
+  /** CUPS printer-state when reported: 3 idle, 4 printing, 5 stopped. 0 when the platform does not say. */
+  status: number;
+}
+
+async function listPrinters(state: NativeState): Promise<PrinterInfo[]> {
+  const wc = state.getWindow()?.webContents;
+  if (!wc) return [];
+  const list = await wc.getPrintersAsync();
+  return list.map((p) => ({ name: p.name, displayName: p.displayName || p.name, description: p.description ?? '', isDefault: String((p.options as Record<string, unknown> | undefined)?.['is-default']) === 'true', status: Number((p.options as Record<string, unknown> | undefined)?.['printer-state'] ?? 0) || 0 }));
+}
+
+/**
+ * Work out where a document should be printed. A chosen printer that no longer exists (unplugged, renamed, driver
+ * removed) falls back to the system print window and says so, rather than failing at the counter.
+ */
+async function resolveTarget(rt: Runtime, state: NativeState, kind: 'receipt' | 'label'): Promise<PrintTarget & { note?: string }> {
+  const chosen = getSetting(rt.db, kind === 'receipt' ? 'printing.receipt_printer' : 'printing.label_printer');
+  const copies = kind === 'receipt' ? getSetting(rt.db, 'printing.receipt_copies') : 1;
+  if (!chosen) return { silent: false, copies };
+  const printers = await listPrinters(state);
+  if (!printers.some((p) => p.name === chosen)) return { silent: false, copies, note: `Printer "${chosen}" was not found, so the print window was used. Check the printer or change it in Settings → Printers.` };
+  return { deviceName: chosen, silent: getSetting(rt.db, 'printing.silent'), copies };
+}
+
+async function printHtml(state: NativeState, html: string, page: PrintPage | ReceiptSize, mode: 'print' | 'pdf', suggestedName: string, target: PrintTarget & { note?: string } = { silent: false, copies: 1 }): Promise<Result> {
   const pg: PrintPage = typeof page === 'string' ? { kind: 'receipt', size: page } : page;
   const a4 = (pg.kind === 'receipt' && pg.size === 'a4') || pg.kind === 'a4-exact';
   const zeroMargins = pg.kind !== 'receipt' || pg.size !== 'a4';
@@ -77,8 +114,8 @@ async function printHtml(state: NativeState, html: string, page: PrintPage | Rec
       return ok({ saved: true, path: res.filePath });
     }
     return await new Promise<Result>((resolve) => {
-      wc.print({ silent: false, printBackground: true, pageSize, margins: zeroMargins ? { marginType: 'none' } : undefined }, (success, reason) => {
-        if (success) resolve(ok({ printed: true }));
+      wc.print({ silent: target.silent && !!target.deviceName, deviceName: target.deviceName, copies: target.copies, printBackground: true, pageSize, margins: zeroMargins ? { marginType: 'none' } : undefined }, (success, reason) => {
+        if (success) resolve(ok({ printed: true, printer: target.deviceName ?? null, silent: target.silent && !!target.deviceName, note: target.note ?? null }));
         else if (/cancel/i.test(reason ?? '')) resolve(ok({ printed: false, cancelled: true }));
         else resolve(err('INTERNAL', `Printing failed: ${reason || 'unknown reason'}. Check that a printer is installed and online, or use Save as PDF.`));
       });
@@ -161,12 +198,17 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const size = p.size ?? getSetting(rt.db, 'invoice.receipt_size');
         const html = buildInvoiceHtml(rt, rt.ctx(), p.id, size, fontBase);
         const inv = rt.db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(p.id) as { invoice_no: string };
-        const res = await printHtml(state, html, size, p.mode, `${inv.invoice_no}.pdf`);
+        const res = await printHtml(state, html, size, p.mode, `${inv.invoice_no}.pdf`, p.mode === 'print' ? await resolveTarget(rt, state, 'receipt') : undefined);
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };
           if (d.printed || d.saved) recordInvoicePrint(rt.ctx(), p.id, p.mode);
         }
         return res;
+      }
+      case 'printers:list': {
+        const u = rt.requireUser();
+        if (!['billing.reprint', 'settings.manage', 'products.view'].some((x) => u.permissions.includes(x as never))) throw new AppError('FORBIDDEN', 'You do not have permission to do this');
+        return ok(await listPrinters(state));
       }
       case 'print:labels': {
         const u = rt.requireUser();
@@ -177,7 +219,7 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         if (built.labels === 0) return err('VALIDATION', 'None of the selected products has a printable barcode.');
         const g = built.geometry;
         const page: PrintPage = p.layout?.kind === 'a4' || (!p.layout && getSetting(rt.db, 'labels.layout').kind === 'a4') ? { kind: 'a4-exact' } : { kind: 'exact', widthMicrons: Math.round(g.pageWidthMm * 1000), heightMicrons: Math.round(g.pageHeightMm * 1000) };
-        const res = await printHtml(state, built.html, page, p.mode, 'barcode-labels.pdf');
+        const res = await printHtml(state, built.html, page, p.mode, 'barcode-labels.pdf', p.mode === 'print' ? await resolveTarget(rt, state, 'label') : undefined);
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };
           if (d.printed || d.saved) recordLabelPrint(rt.ctx(), built.labels, p.mode);
@@ -188,9 +230,10 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const u = rt.requireUser();
         if (!u.permissions.includes('settings.manage')) throw new AppError('FORBIDDEN', 'You do not have permission to do this');
         const p = z.object({ size: z.enum(['58mm', '80mm', 'a4']), mode: z.enum(['print', 'pdf']) }).parse(payload);
+        const target = p.mode === 'print' ? await resolveTarget(rt, state, 'receipt') : undefined;
         const fontBase = pathToFileURL(join(state.rendererRoot, 'fonts')).toString();
         const html = renderInvoiceHtml(sampleInvoice(), shopForPrint(rt), { size: p.size, fontBase });
-        return await printHtml(state, html, p.size, p.mode, 'test-print.pdf');
+        return await printHtml(state, html, p.size, p.mode, 'test-print.pdf', target);
       }
       default:
         return err('NOT_FOUND', 'Unknown operation');

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Eye, FileDown, Printer, Plus } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useShortcuts, loadShortcuts } from '@/hooks/useShortcuts';
 import type { InvoiceDTO } from '@/lib/types';
 import { InvoicePrintDialog } from '@/components/InvoicePrintDialog';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 export function SaleDoneDialog({ invoice, onNewBill }: { invoice: InvoiceDTO | null; onNewBill: () => void }) {
   const toast = useToast();
@@ -19,13 +20,17 @@ export function SaleDoneDialog({ invoice, onNewBill }: { invoice: InvoiceDTO | n
   const [printError, setPrintError] = useState<string | null>(null);
   const open = invoice !== null;
 
+  const { settings } = useAuth();
+  const autoPrinted = useRef<number | null>(null);
+
   const run = async (mode: 'print' | 'pdf') => {
     if (!invoice) return;
     setBusy(true);
     setPrintError(null);
     try {
-      const r = await call<{ printed?: boolean; saved?: boolean; path?: string }>('print:invoice', { id: invoice.id, mode });
-      if (r.printed) toast.success('Sent to the printer');
+      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:invoice', { id: invoice.id, mode });
+      if (r.note) toast.info(r.note);
+      if (r.printed) toast.success(r.printer ? `Sent to ${r.printer}` : 'Sent to the printer');
       if (r.saved) toast.success(`Saved PDF: ${r.path}`);
     } catch (e) {
       setPrintError(errMsg(e));
@@ -33,6 +38,15 @@ export function SaleDoneDialog({ invoice, onNewBill }: { invoice: InvoiceDTO | n
       setBusy(false);
     }
   };
+  // Receipt printing right after the sale, once per invoice, when the shop has switched it on.
+  useEffect(() => {
+    if (invoice && settings?.['printing.auto_print'] && autoPrinted.current !== invoice.id) {
+      autoPrinted.current = invoice.id;
+      void run('print');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoice?.id]);
+
   useShortcuts({ printDocument: () => void run('print'), newBill: onNewBill }, open && !preview);
 
   return (

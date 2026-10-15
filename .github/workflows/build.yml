@@ -22,10 +22,19 @@ jobs:
       - run: npm test
       - name: System libraries for headless Electron
         run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 poppler-utils zbar-tools
+      - name: A real print queue (CUPS-PDF) so printer selection and silent printing are exercised for real
+        run: |
+          sudo apt-get install -y cups cups-pdf
+          sudo cupsd
+          sleep 2
+          sudo lpadmin -p CUPS-PDF -E -v cups-pdf:/ -m lsb/usr/cups-pdf/CUPS-PDF_opt.ppd
+          sudo lpadmin -d CUPS-PDF
+          lpstat -p -d
       - name: End-to-end (real Electron app, virtual display)
         run: xvfb-run -a npm run test:e2e
         env:
           E2E_OUT: ${{ github.workspace }}/e2e-output
+          E2E_PRINTER: CUPS-PDF
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -77,8 +77,9 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
   const run = async (mode: 'print' | 'pdf') => {
     setBusy(true);
     try {
-      const r = await call<{ printed?: boolean; saved?: boolean; path?: string }>('print:labels', { items, layout, startAt: layout.kind === 'a4' ? startAt : 0, mode });
-      if (r.printed) toast.success('Labels sent to the printer');
+      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:labels', { items, layout, startAt: layout.kind === 'a4' ? startAt : 0, mode });
+      if (r.note) toast.info(r.note);
+      if (r.printed) toast.success(r.printer ? `Labels sent to ${r.printer}` : 'Labels sent to the printer');
       if (r.saved) toast.success(`Saved PDF: ${r.path}`);
     } catch (e) {
       toast.error(errMsg(e));
