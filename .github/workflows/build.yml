@@ -114,12 +114,12 @@ jobs:
           name: sri-krishna-billing-windows-installer
           path: release/SriKrishnaBilling-Setup-*.exe
 
-  # Manual only (Actions > Run workflow): publishes the installer that just passed the silent-install + end-to-end run
-  # above as a GitHub Release asset, so it can be downloaded with a normal link (no Actions artifact login needed).
+  # Manual only (Actions > Run workflow): publishes the installers that just passed their install + end-to-end runs above
+  # (Windows .exe, Fedora .rpm) as GitHub Release assets, so they download with a normal link (no Actions artifact login).
   release:
-    name: Publish Windows installer as a release download
+    name: Publish installers as a release download
     if: github.event_name == 'workflow_dispatch'
-    needs: windows
+    needs: [windows, fedora]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -127,13 +127,18 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: sri-krishna-billing-windows-installer
-          path: dist-win
+          path: dist-all
+      - uses: actions/download-artifact@v4
+        with:
+          name: sri-krishna-billing-rpm
+          path: dist-all
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="windows-${GITHUB_SHA::7}"
-          gh release create "$tag" dist-win/SriKrishnaBilling-Setup-*.exe \
+          tag="build-${GITHUB_SHA::7}"
+          ls -la dist-all
+          gh release create "$tag" dist-all/*.exe dist-all/*.rpm \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "Windows installer (build ${GITHUB_SHA::7})" \
-            --notes "Windows installer built from commit $GITHUB_SHA. It passed a silent install and the full end-to-end run on a Windows runner. Unsigned: Windows SmartScreen will warn (More info > Run anyway)."
+            --title "Installers (build ${GITHUB_SHA::7})" \
+            --notes "Windows .exe and Fedora .rpm built from commit $GITHUB_SHA. Each passed a real install and the full end-to-end run (Windows runner / Fedora container). Unsigned: Windows SmartScreen will warn (More info > Run anyway). Fedora: sudo dnf install ./sri-krishna-billing-*.rpm"
