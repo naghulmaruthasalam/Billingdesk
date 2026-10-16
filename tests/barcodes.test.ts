@@ -125,14 +125,14 @@ describe('barcode labels', () => {
   const item = (n: number, barcode: string | null = '2000000000015') => ({ sku: `SK-${n}`, nameEn: `Item ${n}`, nameTa: 'கிளாசிக் பாம்', unit: 'Box', pricePaise: 15000, barcode });
 
   it('renders one page per thermal label with name, price and bars (English only by default)', () => {
-    const r = renderLabelsHtml([item(1), item(2), item(2)], 'Shree Krishna Crackers Shop', DEFAULT_LABEL_LAYOUT, { fontBase: './fonts' });
+    const r = renderLabelsHtml([item(1), item(2), item(2)], 'Sree Krishna Crackers Shop', DEFAULT_LABEL_LAYOUT, { fontBase: './fonts' });
     expect(r.labels).toBe(3);
     expect(r.pages).toBe(3);
     expect(r.html).toContain('@page{size:50mm 30mm;margin:0}');
     expect(r.html).not.toContain('கிளாசிக் பாம்');
     expect(r.html).toContain('₹150.00');
     expect(r.html).toContain('aria-label="Barcode 2000000000015"');
-    expect(r.html).toContain('Shree Krishna Crackers Shop');
+    expect(r.html).toContain('Sree Krishna Crackers Shop');
     expect(r.moduleMm).toBeGreaterThan(0.25); // scannable bar width on a 50 x 30 label
     expect(r.html.match(/class="lb"/g)).toHaveLength(3);
   });

@@ -1,4 +1,4 @@
-# How to run Shree Krishna Billing from this source
+# How to run the Sree Krishna Crackers Shop billing app from this source
 
 Needs: **Node.js 22+** (npm 10+), internet for the first `npm ci`. After that the app itself is fully offline.
 

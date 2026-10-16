@@ -21,7 +21,7 @@ describe('invoice rendering', () => {
     const { app, inv } = await oneBill();
     for (const size of ['58mm', '80mm', 'a4'] as const) {
       const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size, fontBase: './fonts' });
-      expect(html).toContain('Shree Krishna Crackers Shop');
+      expect(html).toContain('Sree Krishna Crackers Shop');
       expect(html).toContain('Classic Bomb');
       expect(html).not.toContain('ஸ்ரீ கிருஷ்ணா பட்டாசு கடை');
       expect(html).not.toContain('கிளாசிக் பாம்');
@@ -84,6 +84,13 @@ describe('invoice rendering', () => {
     await app.call('settings:update', { patch: { 'shop.address': legacy } });
     ensureSeeded(app.rt.db, new Date());
     expect(getSetting(app.rt.db, 'shop.address')).toBe(SETTING_DEFAULTS['shop.address']);
+    // earlier shop-name defaults are upgraded too; a name the owner typed is kept
+    await app.call('settings:update', { patch: { 'shop.name_en': 'Shree Krishna Crackers Shop' } });
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'shop.name_en')).toBe('Sree Krishna Crackers Shop');
+    await app.call('settings:update', { patch: { 'shop.name_en': 'My Shop' } });
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'shop.name_en')).toBe('My Shop');
     await app.call('settings:update', { patch: { 'shop.address': 'My own address' } });
     ensureSeeded(app.rt.db, new Date());
     expect(getSetting(app.rt.db, 'shop.address')).toBe('My own address');

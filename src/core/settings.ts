@@ -74,7 +74,7 @@ export type SettingValue<K extends SettingKey> = z.infer<(typeof SETTINGS_SCHEMA
 
 /** Defaults shipped in earlier builds. A database that still holds one of these (never edited by the owner) is moved to the current default. */
 export const LEGACY_DEFAULTS: Partial<Record<SettingKey, string[]>> = {
-  'shop.name_en': ['Shree Krishna Pattasu Kadai', 'Sri Krishna Pattasu Kadai'],
+  'shop.name_en': ['Shree Krishna Pattasu Kadai', 'Sri Krishna Pattasu Kadai', 'Shree Krishna Crackers Shop'],
   'shop.address': [
     '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Kovaipudur, Coimbatore - 641017.',
     '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Coimbatore - 641017.',
@@ -86,7 +86,7 @@ export const LEGACY_DEFAULTS: Partial<Record<SettingKey, string[]>> = {
 };
 
 export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
-  'shop.name_en': 'Shree Krishna Crackers Shop',
+  'shop.name_en': 'Sree Krishna Crackers Shop',
   'shop.name_ta': 'ஸ்ரீ கிருஷ்ணா பட்டாசு கடை',
   // Transcribed from a photograph of the brochure. The owner must confirm before invoice printing is enabled.
   'shop.address': '4/210, J.V. Complex, Kurunthachalam Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.',

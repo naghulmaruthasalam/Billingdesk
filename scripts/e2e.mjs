@@ -40,7 +40,7 @@ async function launch() {
   page.setDefaultTimeout(15000);
   page.on('pageerror', (e) => console.log('    [pageerror]', e.message));
   await page.setViewportSize({ width: 1366, height: 820 });
-  await page.waitForSelector('text=Shree Krishna Crackers Shop');
+  await page.waitForSelector('text=Sree Krishna Crackers Shop');
   return { app, page };
 }
 
@@ -232,7 +232,7 @@ try {
       const text = readFileSync(txt, 'utf8').normalize('NFC');
       console.log(`    pdftotext excerpt: ${JSON.stringify(text.slice(0, 160))}`);
       assert.match(text, /SKP-000001/);
-      assert.match(text, /Shree Krishna Crackers Shop/);
+      assert.match(text, /Sree Krishna Crackers Shop/);
       assert.doesNotMatch(text, /[\u0B80-\u0BFF]/, 'bills are English only - no Tamil expected');
       assert.match(text, /Discount \(10%\)/);
       assert.match(text, /Total qty: 4/);

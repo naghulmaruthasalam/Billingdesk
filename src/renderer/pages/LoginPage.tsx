@@ -43,7 +43,7 @@ export function LoginPage() {
             <Store className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-base font-semibold leading-tight">Shree Krishna Crackers Shop</div>
+            <div className="text-base font-semibold leading-tight">Sree Krishna Crackers Shop</div>
           </div>
         </div>
         <h1 className="mb-1 text-lg font-semibold">{needsSetup ? 'First-time setup' : 'Sign in'}</h1>

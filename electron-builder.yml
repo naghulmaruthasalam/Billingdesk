@@ -4,7 +4,7 @@
 # better-sqlite3 ships N-API prebuilt binaries for Windows and Linux, so no native rebuild step is needed.
 appId: in.srikrishna.billing
 productName: Sri Krishna Billing
-copyright: Shree Krishna Crackers Shop
+copyright: Sree Krishna Crackers Shop
 directories:
   output: release
   buildResources: resources
@@ -46,8 +46,8 @@ linux:
       arch: [x64]
   icon: resources/icon.png
   category: Office
-  maintainer: Shree Krishna Crackers Shop <noreply@example.invalid>
-  synopsis: Offline billing and inventory for Shree Krishna Crackers Shop
+  maintainer: Sree Krishna Crackers Shop <noreply@example.invalid>
+  synopsis: Offline billing and inventory for Sree Krishna Crackers Shop
   description: Offline-first point-of-sale, inventory and reporting application.
   desktop:
     entry:
