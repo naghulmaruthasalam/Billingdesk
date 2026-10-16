@@ -1,3 +1,4 @@
+import { looksThermal, resolveReceiptMethod } from '@shared/printers';
 import { useState } from 'react';
 import { Printer, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,9 +18,6 @@ interface PrinterInfo {
   model: string;
   status: number;
 }
-
-/** Printers that cannot print a normal page through their driver: text-only drivers, or queues that look like thermal receipt printers. */
-const looksThermal = (p: PrinterInfo | undefined): boolean => !!p && (/text[- ]?only|raw/i.test(p.model) || /\b(RP-?\d|TM-?[A-Z]?\d|POS|thermal|receipt|XP-?\d|TSP)/i.test(`${p.name} ${p.displayName}`));
 
 const stateLabel = (s: number): { text: string; tone: 'green' | 'amber' | 'red' | 'neutral' } =>
   s === 3 ? { text: 'ready', tone: 'green' } : s === 4 ? { text: 'printing', tone: 'amber' } : s === 5 ? { text: 'stopped - check printer', tone: 'red' } : { text: 'status not reported', tone: 'neutral' };
@@ -46,6 +44,17 @@ export function PrintersTab() {
   const list = printers.data ?? [];
   const receipt = settings['printing.receipt_printer'];
   const label = settings['printing.label_printer'];
+  const selectedReceipt = list.find((p) => p.name === (receipt || list.find((x) => x.isDefault)?.name));
+  const platform = typeof navigator !== 'undefined' && /win/i.test(navigator.platform) ? 'win32' : 'linux';
+  const usesEscPos = resolveReceiptMethod(settings['printing.receipt_method'], selectedReceipt, platform) === 'escpos';
+  const methodHint =
+    settings['printing.receipt_method'] === 'auto'
+      ? usesEscPos
+        ? `Detected a thermal receipt printer${selectedReceipt ? ` (${selectedReceipt.displayName})` : ''}: the receipt is drawn as a picture and sent in ESC/POS commands, no driver needed.`
+        : 'Normal printing through the printer driver. Thermal receipt printers (RP-3200, TM-T20, ...) are detected and switched to ESC/POS automatically.'
+      : settings['printing.receipt_method'] === 'escpos'
+        ? 'The receipt is drawn as a picture and sent in ESC/POS commands. Works without a driver.'
+        : 'Normal printing through the printer driver.';
   const options = (current: string) => (
     <>
       <option value="">Ask me which printer each time</option>
@@ -127,13 +136,14 @@ export function PrintersTab() {
             {options(label)}
           </Select>
         </Field>
-        <Field label="How receipts are sent" hint={settings['printing.receipt_method'] === 'escpos' ? 'The receipt is drawn as a picture and sent in ESC/POS commands. Works without a driver.' : 'Normal printing through the printer driver.'}>
+        <Field label="How receipts are sent" hint={methodHint}>
           <Select value={settings['printing.receipt_method']} disabled={!manage} onChange={(e) => void save({ 'printing.receipt_method': e.target.value })} aria-label="How receipts are sent">
+            <option value="auto">Automatic (recommended)</option>
             <option value="driver">Printer driver (normal printers, A4)</option>
             <option value="escpos">Thermal receipt printer - ESC/POS (Linux, no driver needed)</option>
           </Select>
         </Field>
-        {settings['printing.receipt_method'] === 'escpos' ? (
+        {usesEscPos ? (
           <div className="flex items-end">
             <CheckRow checked={settings['printing.cut']} disabled={!manage} onChange={(v) => void save({ 'printing.cut': v })} label="Cut the paper after each receipt" hint="Ignored by printers without a cutter." />
           </div>
@@ -151,10 +161,10 @@ export function PrintersTab() {
         <Notice tone="red">A saved printer is not connected or no longer installed. Printing will use the system default printer until it is back or you pick another printer.</Notice>
       ) : null}
 
-      {settings['printing.receipt_method'] === 'driver' && looksThermal(list.find((p) => p.name === (receipt || list.find((x) => x.isDefault)?.name))) && (
+      {settings['printing.receipt_method'] === 'driver' && looksThermal(selectedReceipt) && (
         <Notice tone="amber">
           <b>This looks like a thermal receipt printer.</b> If its queue uses a text-only or no driver, nothing will print in "Printer driver" mode.{' '}
-          <Button size="sm" variant="outline" className="ml-1" disabled={!manage} onClick={() => void save({ 'printing.receipt_method': 'escpos' })}>Switch to thermal (ESC/POS) mode</Button>
+          <Button size="sm" variant="outline" className="ml-1" disabled={!manage} onClick={() => void save({ 'printing.receipt_method': 'auto' })}>Use automatic mode</Button>
         </Notice>
       )}
 

@@ -159,7 +159,7 @@ On Linux add the printer first in *Settings → Printers* or at `http://localhos
 
 ### Thermal receipt printers (Rongta RP-3200, Epson TM, Xprinter, ...) on Linux
 
-Many receipt printers get a CUPS queue with a **text-only driver** (the options list shows *PrinterEncoding*, *NumLines*, *NumColumns*). Such a queue cannot print a page, so nothing comes out in the normal "Printer driver" mode. Choose **Settings → Printers → How receipts are sent → Thermal receipt printer - ESC/POS** instead:
+Many receipt printers get a CUPS queue with a **text-only driver** (the options list shows *PrinterEncoding*, *NumLines*, *NumColumns*). Such a queue cannot print a page, so nothing comes out in the normal "Printer driver" mode. The default mode is now **Automatic**: thermal-looking queues (name like RP-3200 / TM-T20 / XP-58, or a text-only/raw driver) are sent as ESC/POS by themselves, other printers use their driver. After every print the app also asks CUPS whether the queue is stopped/disabled and says so instead of showing a plain success. Choose **Settings → Printers → How receipts are sent → Thermal receipt printer - ESC/POS** instead:
 
 * the receipt is drawn as a 1-bit picture at the printer's native width (80 mm paper = 576 dots, 58 mm = 384 dots) - so Tamil, bold text, ₹ and barcodes all print - and sent as ESC/POS raster commands through a raw print job (`lp -o raw`), which bypasses the queue's driver;
 * the paper is cut after each receipt (switch off with *Cut the paper after each receipt*); copies and auto-print work as before;

@@ -432,8 +432,19 @@ try {
     assert.ok(rows > 300, 'receipt image is too short');
     assert.ok(app.windows().length >= 1, 'the application must still be running');
     await page.getByText(/Test receipt sent to/).waitFor();
-    // switch back so later steps use the normal driver queue
-    await page.getByLabel('How receipts are sent').selectOption({ value: 'driver' });
+    // Automatic mode must detect this raw/thermal queue by itself and send ESC/POS too (the RP-3200-LITE case)
+    await page.getByLabel('How receipts are sent').selectOption({ value: 'auto' });
+    await page.waitForTimeout(500);
+    const beforeAuto = readdirSync(dir).filter((f) => f.endsWith('.bin')).length;
+    await page.getByRole('button', { name: 'Print test receipt' }).click();
+    let autoJob = false;
+    for (let i = 0; i < 60 && !autoJob; i++) {
+      await page.waitForTimeout(500);
+      autoJob = readdirSync(dir).filter((f) => f.endsWith('.bin')).length > beforeAuto;
+    }
+    assert.ok(autoJob, 'automatic mode did not send ESC/POS to the thermal/raw queue');
+    // switch back so later steps use the normal driver queue (automatic: a normal printer goes through its driver)
+    await page.getByLabel('How receipts are sent').selectOption({ value: 'auto' });
     await page.getByLabel('Receipt printer').selectOption({ value: PRINTER ?? '' });
     await page.waitForTimeout(500);
   });

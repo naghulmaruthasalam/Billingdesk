@@ -62,7 +62,7 @@ export const SETTINGS_SCHEMA = {
   /** Print the receipt automatically as soon as a sale is completed. */
   'printing.auto_print': z.boolean(),
   /** 'driver': print through the printer driver. 'escpos': draw the receipt as an image and send ESC/POS commands (thermal receipt printers; no driver needed). */
-  'printing.receipt_method': z.enum(['driver', 'escpos']),
+  'printing.receipt_method': z.enum(['auto', 'driver', 'escpos']),
   /** Cut the paper after each receipt in ESC/POS mode. */
   'printing.cut': z.boolean(),
   'auth.recovery_hash': z.string().max(200),
@@ -81,6 +81,8 @@ export const LEGACY_DEFAULTS: Partial<Record<SettingKey, string[]>> = {
     '4/210, J.V. Complex, Gurunthasala Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.',
   ],
   'invoice.footer_en': ['Thank you. Celebrate safely!'],
+  // 'driver' was the old default; it prints nothing on thermal queues with a text-only driver, so such databases move to 'auto'.
+  'printing.receipt_method': ['driver'],
 };
 
 export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
@@ -121,7 +123,7 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'printing.silent': false,
   'printing.receipt_copies': 1,
   'printing.auto_print': false,
-  'printing.receipt_method': 'driver',
+  'printing.receipt_method': 'auto',
   'printing.cut': true,
   'auth.recovery_hash': '',
   'catalogue.seeded': false,

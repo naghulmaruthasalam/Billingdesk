@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, shell, type WebContents } from 'electron';
 import { mkdirSync, readFileSync, writeFileSync, rmSync, statSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { bgraToGray, encodeReceipt, THERMAL_PAPER } from '../core/escpos';
+import { resolveReceiptMethod, type ReceiptMethod } from '../shared/printers';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
@@ -33,6 +34,24 @@ function requireSignedIn(rt: Runtime): void {
 }
 
 const filtersSchema = z.array(z.object({ name: z.string().max(40), extensions: z.array(z.string().regex(/^[A-Za-z0-9]{1,8}$/)).max(6) })).max(4).optional();
+
+/**
+ * After a job is handed to CUPS, ask the queue whether the printer is actually accepting work. A stopped/disabled queue
+ * (unplugged USB printer, no permission to the device, ...) otherwise swallows the job silently. Returns a warning to show
+ * the user, or undefined when everything looks fine or the system has no `lpstat`.
+ */
+async function queueWarning(printer: string): Promise<string | undefined> {
+  if (process.platform === 'win32') return undefined;
+  await new Promise((r) => setTimeout(r, 1500));
+  return await new Promise<string | undefined>((resolve) => {
+    execFile('lpstat', ['-p', printer], { timeout: 5000 }, (e, out) => {
+      if (e) return resolve(undefined);
+      const text = String(out).trim();
+      if (/disabled|stopped|not accepting/i.test(text)) resolve(`The job was queued but the printer "${printer}" reports a problem: ${text.split('\n')[0]}. Check that it is switched on, connected by USB and has paper, then re-enable it (Linux: cupsenable ${printer}).`);
+      else resolve(undefined);
+    });
+  });
+}
 
 /** Print a standalone HTML document through a hidden, sandboxed window. */
 /**
@@ -74,7 +93,8 @@ async function printEscPos(_state: NativeState, html: string, size: '58mm' | '80
         else resolve();
       });
     });
-    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method: 'escpos', note: target.note ?? null });
+    const warn = await queueWarning(target.deviceName!);
+    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method: 'escpos', note: [target.note, warn].filter(Boolean).join(' ') || null });
   } catch (e) {
     log.error('ESC/POS print failed', e);
     return err('INTERNAL', `Printing failed: ${e instanceof Error ? e.message : String(e)}. Check that the printer is on, has paper and is selected in Settings → Printers.`);
@@ -125,6 +145,14 @@ async function listPrinters(state: NativeState): Promise<PrinterInfo[]> {
  * Chromium from a hidden window, which is unreliable on Linux. Instead the app always prints directly to a named printer:
  * the one the user picked for this print, else the saved one, else the system default (else the first installed).
  */
+/** Decide whether a receipt goes through the printer driver or as ESC/POS commands ('auto' looks at the chosen printer). */
+async function receiptMethodFor(rt: Runtime, state: NativeState, target: PrintTarget | undefined): Promise<'driver' | 'escpos'> {
+  const method = getSetting(rt.db, 'printing.receipt_method') as ReceiptMethod;
+  if (method !== 'auto') return method;
+  const printer = (await listPrinters(state)).find((p) => p.name === target?.deviceName);
+  return resolveReceiptMethod(method, printer, process.platform);
+}
+
 async function resolveTarget(rt: Runtime, state: NativeState, kind: 'receipt' | 'label', override?: string): Promise<PrintTarget & { note?: string }> {
   const saved = getSetting(rt.db, kind === 'receipt' ? 'printing.receipt_printer' : 'printing.label_printer');
   const copies = kind === 'receipt' ? getSetting(rt.db, 'printing.receipt_copies') : 1;
@@ -179,7 +207,7 @@ async function printHtml(state: NativeState, html: string, page: PrintPage | Rec
     }
     return await new Promise<Result>((resolve) => {
       wc.print({ silent: true, deviceName: target.deviceName, copies: target.copies, printBackground: true, pageSize, margins: zeroMargins ? { marginType: 'none' } : undefined }, (success, reason) => {
-        if (success) resolve(ok({ printed: true, printer: target.deviceName ?? null, silent: true, note: target.note ?? null }));
+        if (success) void (target.deviceName ? queueWarning(target.deviceName) : Promise.resolve(undefined)).then((warn) => resolve(ok({ printed: true, printer: target.deviceName ?? null, silent: true, note: [target.note, warn].filter(Boolean).join(' ') || null })));
         else if (/cancel/i.test(reason ?? '')) resolve(ok({ printed: false, cancelled: true }));
         else resolve(err('INTERNAL', `Printing failed: ${reason || 'unknown reason'}. Check that a printer is installed and online, or use Save as PDF.`));
       });
@@ -268,7 +296,7 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const html = buildInvoiceHtml(rt, rt.ctx(), p.id, size, fontBase);
         const inv = rt.db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(p.id) as { invoice_no: string };
         const target = p.mode === 'print' ? await resolveTarget(rt, state, 'receipt', p.printer) : undefined;
-        const useEscPos = p.mode === 'print' && size !== 'a4' && getSetting(rt.db, 'printing.receipt_method') === 'escpos';
+        const useEscPos = p.mode === 'print' && size !== 'a4' && (await receiptMethodFor(rt, state, target)) === 'escpos';
         const res = useEscPos ? await printEscPos(state, html, size as '58mm' | '80mm', target!, getSetting(rt.db, 'printing.cut')) : await printHtml(state, html, size, p.mode, `${inv.invoice_no}.pdf`, target);
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };
@@ -304,7 +332,7 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const target = p.mode === 'print' ? await resolveTarget(rt, state, 'receipt', p.printer) : undefined;
         const fontBase = pathToFileURL(join(state.rendererRoot, 'fonts')).toString();
         const html = renderInvoiceHtml(sampleInvoice(), shopForPrint(rt), { size: p.size, fontBase });
-        if (target && p.size !== 'a4' && getSetting(rt.db, 'printing.receipt_method') === 'escpos') return await printEscPos(state, html, p.size, target, getSetting(rt.db, 'printing.cut'));
+        if (target && p.size !== 'a4' && (await receiptMethodFor(rt, state, target)) === 'escpos') return await printEscPos(state, html, p.size, target, getSetting(rt.db, 'printing.cut'));
         return await printHtml(state, html, p.size, p.mode, 'test-print.pdf', target);
       }
       default:
