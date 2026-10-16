@@ -78,6 +78,7 @@ export const LEGACY_DEFAULTS: Partial<Record<SettingKey, string[]>> = {
   'shop.address': [
     '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Kovaipudur, Coimbatore - 641017.',
     '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Coimbatore - 641017.',
+    '4/210, J.V. Complex, Gurunthasala Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.',
   ],
   'invoice.footer_en': ['Thank you. Celebrate safely!'],
 };
@@ -86,8 +87,8 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'shop.name_en': 'Shree Krishna Crackers Shop',
   'shop.name_ta': 'ஸ்ரீ கிருஷ்ணா பட்டாசு கடை',
   // Transcribed from a photograph of the brochure. The owner must confirm before invoice printing is enabled.
-  'shop.address': '4/210, J.V. Complex, Gurunthasala Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.',
-  'shop.address_ta': '4/210, ஜே.வி. காம்பளக்ஸ், குருந்தாசல நகர், என்.ஜி.ஜி.ஓ. காலனி மெயின் ரோடு, கோயம்புத்தூர் - 641017.',
+  'shop.address': '4/210, J.V. Complex, Kurunthachalam Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.',
+  'shop.address_ta': '4/210, ஜே.வி. காம்பளக்ஸ், குருந்தாசலம் நகர், என்.ஜி.ஜி.ஓ. காலனி மெயின் ரோடு, கோயம்புத்தூர் - 641017.',
   'shop.phones': ['98426 81816', '98437 81816'],
   'shop.tax_id': '',
   'shop.logo_data_url': '',

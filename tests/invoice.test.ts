@@ -76,7 +76,7 @@ describe('invoice rendering', () => {
   it('prints the address on two lines exactly as set, and upgrades an untouched older default', async () => {
     const { app, inv } = await oneBill();
     const html = renderInvoiceHtml(inv, shopForPrint(app.rt), { size: '80mm', fontBase: '.' });
-    expect(html).toContain('4/210, J.V. Complex, Gurunthasala Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.');
+    expect(html).toContain('4/210, J.V. Complex, Kurunthachalam Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.');
     expect(html).toContain('.addr{white-space:pre-line');
     expect(html).not.toContain('Kovaipudur');
     // a database still holding an earlier shipped default (never edited) is moved to the current one; edited values are left alone

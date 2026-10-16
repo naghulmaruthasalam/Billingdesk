@@ -240,7 +240,7 @@ try {
       assert.match(text, /Goods once sold cannot be taken back/);
       assert.match(text, /Happy Diwali/);
       assert.doesNotMatch(text, /Kovaipudur/);
-      assert.match(text, /4\/210, J\.V\. Complex, Gurunthasala Nagar,\s+N\.G\.G\.O\. Colony Main Road, Coimbatore -\s+641017\./, 'address with NGGO Colony on the bill');
+      assert.match(text, /4\/210, J\.V\. Complex, Kurunthachalam Nagar,\s+N\.G\.G\.O\. Colony Main Road, Coimbatore -\s+641017\./, 'address with NGGO Colony on the bill');
       assert.match(text, /778\.50/);
       assert.match(text, /Classic Bomb/);
       assert.doesNotMatch(text, /DUPLICATE COPY/, 'first print must not be marked as a duplicate');
