@@ -238,7 +238,9 @@ try {
       assert.match(text, /Total qty: 4/);
       assert.match(text, /Item\s+Price\s+Qty\s+Total/, 'column order: item, price, qty, total');
       assert.match(text, /Goods once sold cannot be taken back/);
-      assert.match(text, /Happy Diwali/);
+      assert.match(text, /Wishing you a Happy Diwali/);
+      assert.match(text, /Paid - Cash\s+₹778\.50/);
+      assert.doesNotMatch(text, /tendered/);
       assert.doesNotMatch(text, /Kovaipudur/);
       assert.match(text, /4\/210, J\.V\. Complex, Kurunthachalam Nagar,\s+N\.G\.G\.O\. Colony Main Road, Coimbatore -\s+641017\./, 'address with NGGO Colony on the bill');
       assert.match(text, /778\.50/);

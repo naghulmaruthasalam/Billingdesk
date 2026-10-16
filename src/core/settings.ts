@@ -81,6 +81,7 @@ export const LEGACY_DEFAULTS: Partial<Record<SettingKey, string[]>> = {
     '4/210, J.V. Complex, Gurunthasala Nagar,\nN.G.G.O. Colony Main Road, Coimbatore - 641017.',
   ],
   'invoice.footer_en': ['Thank you. Celebrate safely!'],
+  'invoice.greeting': ['Happy Diwali 🎆'],
   // 'driver' was the old default; it prints nothing on thermal queues with a text-only driver, so such databases move to 'auto'.
   'printing.receipt_method': ['driver'],
 };
@@ -96,7 +97,7 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'shop.logo_data_url': '',
   'invoice.footer_en': 'Goods once sold cannot be taken back.',
   'invoice.footer_ta': 'அனைவருக்கும் தீபாவளி நல்வாழ்த்துக்கள்',
-  'invoice.greeting': 'Happy Diwali 🎆',
+  'invoice.greeting': 'Wishing you a Happy Diwali 🎆',
   'invoice.prefix': 'SKP',
   'invoice.pad': 6,
   'invoice.receipt_size': '80mm',

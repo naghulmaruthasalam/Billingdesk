@@ -134,7 +134,7 @@ function totalsRows(inv: PrintableInvoice, shop: PrintableShop, cls: 'a4' | 'the
   const row = (l: string, v: string, c?: string) => (cls === 'a4' ? `<div class="${c ?? ''}"><span>${esc(l)}</span><span class="num">${esc(v)}</span></div>` : `<div class="row ${c ?? ''}"><span>${esc(l)}</span><span class="num">${esc(v)}</span></div>`);
   let out = rows.map(([l, v, c]) => row(l, v, c)).join('');
   for (const p of inv.payments.filter((x) => x.kind !== 'refund')) {
-    out += row(`Paid - ${MODE_LABEL[p.mode] ?? p.mode}${p.mode === 'cash' && p.tenderedPaise && p.tenderedPaise > p.amountPaise ? ` (tendered ${formatAmount(p.tenderedPaise)})` : ''}`, formatINR(p.amountPaise));
+    out += row(`Paid - ${MODE_LABEL[p.mode] ?? p.mode}`, formatINR(p.amountPaise));
   }
   if (inv.changePaise > 0) out += row('Change returned', formatINR(inv.changePaise));
   if (inv.duePaise > 0) out += row('Balance due', formatINR(inv.duePaise), 'grand');

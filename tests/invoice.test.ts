@@ -59,6 +59,15 @@ describe('invoice rendering', () => {
     expect(a4).toMatch(/<th>Item<\/th><th class="r">Price[^<]*<\/th><th class="r">Qty<\/th><th class="r">Total/);
   });
 
+  it('shows just "Paid - <method>" with the amount, without repeating the cash tendered', async () => {
+    const { app, inv } = await oneBill();
+    const html = renderInvoiceHtml({ ...inv, payments: [{ kind: 'sale', mode: 'cash', amountPaise: 27000, tenderedPaise: 50000 }], changePaise: 23000 }, shopForPrint(app.rt), { size: '80mm', fontBase: '.' });
+    expect(html).toContain('Paid - Cash');
+    expect(html).not.toContain('tendered');
+    expect(html).not.toContain('500.00');
+    expect(html).toContain('Change returned');
+  });
+
   it('shows the total quantity beside the total, the no-return tagline and the greeting', async () => {
     const { app, inv } = await oneBill();
     for (const size of ['58mm', '80mm', 'a4'] as const) {
@@ -67,7 +76,7 @@ describe('invoice rendering', () => {
       expect(html.indexOf('Net payable')).toBeLessThan(html.indexOf('Total qty'));
       expect(html.indexOf('Total qty')).toBeLessThan(html.indexOf('Goods once sold')); // directly above the tagline
       expect(html).toContain('Goods once sold cannot be taken back.');
-      expect(html).toContain('Happy Diwali 🎆');
+      expect(html).toContain('Wishing you a Happy Diwali 🎆');
       expect(html.lastIndexOf('Happy Diwali')).toBeGreaterThan(html.indexOf('Goods once sold'));
       expect(html).not.toContain('Kovaipudur');
     }
@@ -84,6 +93,9 @@ describe('invoice rendering', () => {
     await app.call('settings:update', { patch: { 'shop.address': legacy } });
     ensureSeeded(app.rt.db, new Date());
     expect(getSetting(app.rt.db, 'shop.address')).toBe(SETTING_DEFAULTS['shop.address']);
+    await app.call('settings:update', { patch: { 'invoice.greeting': 'Happy Diwali 🎆' } });
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'invoice.greeting')).toBe('Wishing you a Happy Diwali 🎆');
     // earlier shop-name defaults are upgraded too; a name the owner typed is kept
     await app.call('settings:update', { patch: { 'shop.name_en': 'Shree Krishna Crackers Shop' } });
     ensureSeeded(app.rt.db, new Date());
