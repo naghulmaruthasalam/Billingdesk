@@ -61,11 +61,19 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: node node_modules/electron/install.js
       - run: npm run dist:rpm
+      - name: Upgrade path - the previously published package (sri-krishna-billing) is replaced by the renamed one
+        run: |
+          curl -fsSL -o /tmp/old.rpm https://github.com/naghulmaruthasalam/Billingdesk/releases/download/build-389e73e/sri-krishna-billing-1.0.0.x86_64.rpm
+          dnf install -y /tmp/old.rpm
+          rpm -q sri-krishna-billing
       - name: Install the RPM with dnf
-        run: dnf install -y ./release/sri-krishna-billing-*.x86_64.rpm
+        run: |
+          dnf install -y ./release/sree-krishna-billing-*.x86_64.rpm
+          rpm -q sree-krishna-billing
+          if rpm -q sri-krishna-billing; then echo "old package still installed"; exit 1; fi
       - name: End-to-end against the installed application
         run: |
-          APP=$(rpm -ql sri-krishna-billing | grep -E '/sri-krishna-billing$' | head -n1)
+          APP=$(rpm -ql sree-krishna-billing | grep -E '/sree-krishna-billing$' | head -n1)
           echo "Installed binary: $APP"
           E2E_EXECUTABLE="$APP" E2E_OUT="$GITHUB_WORKSPACE/e2e-output" xvfb-run -a node scripts/e2e.mjs
       - uses: actions/upload-artifact@v4
@@ -75,7 +83,7 @@ jobs:
           path: e2e-output/
       - uses: actions/upload-artifact@v4
         with:
-          name: sri-krishna-billing-rpm
+          name: sree-krishna-billing-rpm
           path: release/*.rpm
 
   windows:
@@ -92,9 +100,9 @@ jobs:
       - name: Silent install
         shell: pwsh
         run: |
-          $setup = Get-ChildItem release\SriKrishnaBilling-Setup-*-win-x64.exe | Select-Object -First 1
+          $setup = Get-ChildItem release\SreeKrishnaBilling-Setup-*-win-x64.exe | Select-Object -First 1
           Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
-          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Sri Krishna Billing.exe' | Select-Object -First 1
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Sree Krishna Billing.exe' | Select-Object -First 1
           if (-not $exe) { throw 'Installed application not found' }
           "APP_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Installed at $($exe.FullName)"
@@ -111,8 +119,8 @@ jobs:
           path: e2e-output/
       - uses: actions/upload-artifact@v4
         with:
-          name: sri-krishna-billing-windows-installer
-          path: release/SriKrishnaBilling-Setup-*.exe
+          name: sree-krishna-billing-windows-installer
+          path: release/SreeKrishnaBilling-Setup-*.exe
 
   # Manual only (Actions > Run workflow): publishes the installers that just passed their install + end-to-end runs above
   # (Windows .exe, Fedora .rpm) as GitHub Release assets, so they download with a normal link (no Actions artifact login).
@@ -126,11 +134,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: sri-krishna-billing-windows-installer
+          name: sree-krishna-billing-windows-installer
           path: dist-all
       - uses: actions/download-artifact@v4
         with:
-          name: sri-krishna-billing-rpm
+          name: sree-krishna-billing-rpm
           path: dist-all
       - name: Create the release
         env:
@@ -141,4 +149,4 @@ jobs:
           gh release create "$tag" dist-all/*.exe dist-all/*.rpm \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Installers (build ${GITHUB_SHA::7})" \
-            --notes "Windows .exe and Fedora .rpm built from commit $GITHUB_SHA. Each passed a real install and the full end-to-end run (Windows runner / Fedora container). Unsigned: Windows SmartScreen will warn (More info > Run anyway). Fedora: sudo dnf install ./sri-krishna-billing-*.rpm"
+            --notes "Windows .exe and Fedora .rpm built from commit $GITHUB_SHA. Each passed a real install and the full end-to-end run (Windows runner / Fedora container). Unsigned: Windows SmartScreen will warn (More info > Run anyway). Fedora: sudo dnf install ./sree-krishna-billing-*.rpm"

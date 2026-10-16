@@ -29,12 +29,12 @@ node node_modules/electron/install.js
 echo "==> Building the RPM"
 npm run dist:rpm
 
-RPM="$(ls -1 release/sri-krishna-billing-*.x86_64.rpm | head -n1)"
+RPM="$(ls -1 release/sree-krishna-billing-*.x86_64.rpm | head -n1)"
 echo
 echo "Built: $RPM"
 if [ "${1:-}" = "--install" ]; then
   $SUDO dnf install -y "./$RPM"
-  echo "Installed. Start it from the application menu (Sri Krishna Billing) or run: \"/opt/Sri Krishna Billing/sri-krishna-billing\""
+  echo "Installed. Start it from the application menu (Sree Krishna Billing) or run: \"/opt/Sree Krishna Billing/sree-krishna-billing\""
 else
   echo "Install with: sudo dnf install ./$RPM"
 fi

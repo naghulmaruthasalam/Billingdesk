@@ -124,7 +124,7 @@ export function inspectBackup(file: string): BackupInspection {
     const header = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
     const names = new Set(header.map((h) => h.name));
     const missing = REQUIRED_TABLES.filter((t) => !names.has(t));
-    if (missing.length) base.errors.push(`Not a Sri Krishna Billing database (missing tables: ${missing.join(', ')})`);
+    if (missing.length) base.errors.push(`Not a Sree Krishna Billing database (missing tables: ${missing.join(', ')})`);
     const ic = integrityCheck(db);
     if (!ic.ok) base.errors.push(...ic.messages.map((m) => `Integrity check: ${m}`));
     if (!missing.length) {

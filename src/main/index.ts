@@ -4,11 +4,12 @@ import { pathToFileURL } from 'node:url';
 import { Runtime } from '../core/runtime';
 import { dispatch, isKnownChannel } from '../core/api';
 import { NATIVE_CHANNELS, IPC_INVOKE } from '../shared/channels';
-import { backupsDir, dbFile } from './paths';
+import { backupsDir, dbFile, useDataFolder, APP_NAME } from './paths';
 import { handleNative, type NativeState } from './native';
 import { log } from './logger';
 
-app.setName('Sri Krishna Billing');
+app.setName(APP_NAME);
+useDataFolder();
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL || '';
 const isDev = !!DEV_URL && !app.isPackaged;
@@ -55,7 +56,7 @@ function createWindow(): void {
     minWidth: 1024,
     minHeight: 640,
     backgroundColor: '#FFFFFF',
-    title: 'Sri Krishna Billing',
+    title: 'Sree Krishna Billing',
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
@@ -109,7 +110,7 @@ void app.whenReady().then(async () => {
   } catch (e) {
     log.error('failed to open database', e);
     const { dialog } = await import('electron');
-    dialog.showErrorBox('Sri Krishna Billing cannot start', `The database could not be opened:\n\n${e instanceof Error ? e.message : String(e)}\n\nYour data has not been modified. See the troubleshooting guide, or restore a backup.`);
+    dialog.showErrorBox('Sree Krishna Billing cannot start', `The database could not be opened:\n\n${e instanceof Error ? e.message : String(e)}\n\nYour data has not been modified. See the troubleshooting guide, or restore a backup.`);
     app.exit(1);
     return;
   }

@@ -3,12 +3,12 @@
 //
 //   node scripts/start-fresh.mjs            (shows what it would do)
 //   node scripts/start-fresh.mjs --yes      (does it)
-//   node scripts/start-fresh.mjs --yes --data-dir "/path/to/Sri Krishna Billing"
+//   node scripts/start-fresh.mjs --yes --data-dir "/path/to/Sree Krishna Billing"
 //
 // Nothing is deleted: the whole data folder (database, backups, logs) is MOVED to "<folder>.old-<timestamp>" so it can be
 // moved back if this was a mistake. The next launch shows the first-time setup screen (create the owner account, confirm the
 // address, approve the catalogue) and seeds the shop name "Sree Krishna Crackers Shop".
-// Close Sri Krishna Billing before running this. No dependencies: plain Node.js 18+.
+// Close Sree Krishna Billing before running this. No dependencies: plain Node.js 18+.
 import { existsSync, renameSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -20,11 +20,12 @@ const opt = (name) => {
 };
 
 function defaultDataDir() {
-  const name = 'Sri Krishna Billing';
   if (process.env.SKB_DATA_DIR) return process.env.SKB_DATA_DIR;
-  if (platform() === 'win32') return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), name);
-  if (platform() === 'darwin') return join(homedir(), 'Library', 'Application Support', name);
-  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), name);
+  const base =
+    platform() === 'win32' ? (process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming')) : platform() === 'darwin' ? join(homedir(), 'Library', 'Application Support') : (process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'));
+  const current = join(base, 'Sree Krishna Billing');
+  const legacy = join(base, 'Sri Krishna Billing'); // folder name used before the product was renamed
+  return !existsSync(current) && existsSync(legacy) ? legacy : current;
 }
 
 const dataDir = resolve(opt('data-dir') ?? defaultDataDir());

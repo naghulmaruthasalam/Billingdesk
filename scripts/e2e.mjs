@@ -86,7 +86,7 @@ const money = (s) => Number(s.replace(/[^\d.]/g, ''));
 let { app, page } = await launch();
 
 try {
-  console.log('Sri Krishna Billing - end-to-end run');
+  console.log('Sree Krishna Billing - end-to-end run');
   console.log(`  data dir: ${dataDir}`);
 
   await step('first-run setup creates the owner and shows a recovery code', async () => {

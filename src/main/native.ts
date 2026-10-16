@@ -283,7 +283,7 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
       case 'dialog:chooseBackupFile': {
         requireSignedIn(rt);
         const parent = state.getWindow();
-        const opts = { properties: ['openFile' as const], defaultPath: rt.backupDir(), filters: [{ name: 'Sri Krishna Billing backup', extensions: ['sqlite'] }] };
+        const opts = { properties: ['openFile' as const], defaultPath: rt.backupDir(), filters: [{ name: 'Sree Krishna Billing backup', extensions: ['sqlite'] }] };
         const res = parent ? await dialog.showOpenDialog(parent, opts) : await dialog.showOpenDialog(opts);
         return ok(res.canceled || !res.filePaths[0] ? null : res.filePaths[0]);
       }

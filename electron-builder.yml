@@ -1,9 +1,9 @@
-# Packaging for Sri Krishna Billing.
-#   Windows (NSIS .exe):  npm run dist:win     -> release/SriKrishnaBilling-Setup-<version>-win-x64.exe
-#   Fedora (.rpm):        npm run dist:rpm     -> release/sri-krishna-billing-<version>.x86_64.rpm
+# Packaging for Sree Krishna Billing.
+#   Windows (NSIS .exe):  npm run dist:win     -> release/SreeKrishnaBilling-Setup-<version>-win-x64.exe
+#   Fedora (.rpm):        npm run dist:rpm     -> release/sree-krishna-billing-<version>.x86_64.rpm
 # better-sqlite3 ships N-API prebuilt binaries for Windows and Linux, so no native rebuild step is needed.
 appId: in.srikrishna.billing
-productName: Sri Krishna Billing
+productName: Sree Krishna Billing
 copyright: Sree Krishna Crackers Shop
 directories:
   output: release
@@ -30,15 +30,15 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.png
-  artifactName: SriKrishnaBilling-Setup-${version}-win-x64.${ext}
+  artifactName: SreeKrishnaBilling-Setup-${version}-win-x64.${ext}
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Sri Krishna Billing
-  # Uninstalling never deletes the shop's data (it lives in %APPDATA%\Sri Krishna Billing).
+  shortcutName: Sree Krishna Billing
+  # Uninstalling never deletes the shop's data (it lives in %APPDATA%\Sree Krishna Billing).
   deleteAppDataOnUninstall: false
 linux:
   target:
@@ -51,9 +51,13 @@ linux:
   description: Offline-first point-of-sale, inventory and reporting application.
   desktop:
     entry:
-      Name: Sri Krishna Billing
+      Name: Sree Krishna Billing
       Comment: Billing and inventory
       Categories: Office;Finance;
 rpm:
-  artifactName: sri-krishna-billing-${version}.${arch}.rpm
-  packageName: sri-krishna-billing
+  artifactName: sree-krishna-billing-${version}.${arch}.rpm
+  packageName: sree-krishna-billing
+  # The product was renamed (package sri-krishna-billing before): installing this package replaces the old one.
+  fpm:
+    - --replaces
+    - sri-krishna-billing

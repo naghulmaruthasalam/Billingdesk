@@ -1,4 +1,4 @@
-# Sri Krishna Billing
+# Sree Krishna Billing
 
 Offline-first desktop billing, inventory and reporting for **Sree Krishna Crackers Shop** (ஸ்ரீ கிருஷ்ணா பட்டாசு கடை), Coimbatore.
 
@@ -52,8 +52,8 @@ On Linux as `root` (containers/CI) the dev script adds `--no-sandbox` automatica
 | `npm test` | Vitest unit/integration tests (real SQLite, no mocks of the database) |
 | `npm run test:e2e` | Build, then drive the real Electron app with Playwright (needs a display; on Linux use `xvfb-run -a npm run test:e2e`; `poppler-utils` enables PDF text/font checks and `zbar-tools` the barcode-decode checks) |
 | `npm run pack` | Unpacked app in `release/<platform>-unpacked` (quick packaging check) |
-| `npm run dist:win` | Windows NSIS installer → `release/SriKrishnaBilling-Setup-<version>-win-x64.exe` |
-| `npm run dist:rpm` | Fedora RPM → `release/sri-krishna-billing-<version>.x86_64.rpm` |
+| `npm run dist:win` | Windows NSIS installer → `release/SreeKrishnaBilling-Setup-<version>-win-x64.exe` |
+| `npm run dist:rpm` | Fedora RPM → `release/sree-krishna-billing-<version>.x86_64.rpm` |
 | `npm run fonts` | Re-copy the bundled fonts from `node_modules` into `public/fonts` |
 
 `E2E_EXECUTABLE=<path>` points the e2e run at a packaged/installed application instead of the source tree; `E2E_OUT=<dir>` sets where screenshots and the generated PDF go.
@@ -120,8 +120,8 @@ User data is **never** stored in the install directory:
 
 | OS | Location |
 |---|---|
-| Windows | `%APPDATA%\Sri Krishna Billing\` |
-| Linux | `~/.config/Sri Krishna Billing/` |
+| Windows | `%APPDATA%\Sree Krishna Billing\` |
+| Linux | `~/.config/Sree Krishna Billing/` |
 
 Inside: `data/skbilling.sqlite` (WAL mode, `synchronous=FULL`), `backups/`, `logs/main.log`. Uninstalling does not delete it.
 
@@ -181,7 +181,7 @@ npm run dist:win      # on Windows: no extras. On Linux: needs wine (+ wine32) f
 
 `.github/workflows/build.yml` builds and tests on `ubuntu-latest`, builds the RPM and installs it with `dnf` inside a `fedora` container, and builds the NSIS installer on `windows-latest`, silently installing it - each followed by the end-to-end run against the **installed** application.
 
-Install on Fedora: `sudo dnf install ./sri-krishna-billing-1.0.0.x86_64.rpm` (installs to `/opt/Sri Krishna Billing/`, adds a desktop entry). Windows: run the setup `.exe` (per-user, choose folder, desktop shortcut). The installers are **unsigned**, so Windows SmartScreen will warn; code signing needs a certificate that the shop must purchase.
+Install on Fedora: `sudo dnf install ./sree-krishna-billing-1.0.0.x86_64.rpm` (installs to `/opt/Sree Krishna Billing/`, adds a desktop entry). Windows: run the setup `.exe` (per-user, choose folder, desktop shortcut). The installers are **unsigned**, so Windows SmartScreen will warn; code signing needs a certificate that the shop must purchase.
 
 ## Testing
 

@@ -3,12 +3,12 @@
 //
 //   node scripts/reset-owner-password.mjs                 (asks for the new password)
 //   node scripts/reset-owner-password.mjs --user owner    (when there is more than one owner)
-//   node scripts/reset-owner-password.mjs --data-dir "/path/to/Sri Krishna Billing"
+//   node scripts/reset-owner-password.mjs --data-dir "/path/to/Sree Krishna Billing"
 //
 // Requires access to the computer's data folder (the same trust the whole database already relies on). Nothing but the
 // owner's password and the recovery code changes: bills, stock and products are untouched. A copy of the database is
 // saved first, the reset is written to the audit log, and a NEW recovery code is printed - write it down.
-// Close Sri Krishna Billing before running this.
+// Close Sree Krishna Billing before running this.
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
@@ -27,11 +27,12 @@ const opt = (name) => {
 };
 
 function defaultDataDir() {
-  const name = 'Sri Krishna Billing';
   if (process.env.SKB_DATA_DIR) return process.env.SKB_DATA_DIR;
-  if (platform() === 'win32') return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), name);
-  if (platform() === 'darwin') return join(homedir(), 'Library', 'Application Support', name);
-  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), name);
+  const base =
+    platform() === 'win32' ? (process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming')) : platform() === 'darwin' ? join(homedir(), 'Library', 'Application Support') : (process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'));
+  const current = join(base, 'Sree Krishna Billing');
+  const legacy = join(base, 'Sri Krishna Billing'); // folder name used before the product was renamed
+  return !existsSync(current) && existsSync(legacy) ? legacy : current;
 }
 
 function askHidden(question) {
@@ -107,5 +108,5 @@ Owner password reset for "${owner.username}".
 
       ${recoveryCode}
 
-Start Sri Krishna Billing and sign in as "${owner.username}" with the new password.
+Start Sree Krishna Billing and sign in as "${owner.username}" with the new password.
 `);
