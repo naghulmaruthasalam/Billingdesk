@@ -558,7 +558,7 @@ try {
     const abuf = readFileSync(alFile);
     const atext = abuf.toString('latin1');
     assert.equal(atext.match(/PRINT 1,1/g).length, 2, 'two rows of frames');
-    let apos = 0, rowIdx = 0;
+    let rowIdx = 0;
     for (const m of atext.matchAll(/BITMAP 0,0,(\d+),(\d+),0,/g)) {
       const abpr = Number(m[1]), ah = Number(m[2]), start = m.index + m[0].length;
       const apx = (x, y) => (abuf[start + y * abpr + (x >> 3)] & (0x80 >> (x & 7))) === 0;
@@ -571,7 +571,6 @@ try {
         if (idx > 0) assert.ok(!apx(x0 - 6, Math.round(ah / 2)), 'the gap between two labels must stay white');
       }
       rowIdx++;
-      apos = start;
     }
     assert.equal(rowIdx, 2);
     await page.evaluate(() => window.skb.invoke('settings:update', { patch: { 'printing.label_method': 'auto', 'labels.layout': { kind: 'thermal', widthMm: 34, heightMm: 20, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true } } }));
