@@ -12,6 +12,14 @@ npmRebuild: false
 nodeGypRebuild: false
 buildDependenciesFromSource: false
 asar: true
+# Offline tools available on the installed computer: /opt/Sree Krishna Billing/resources/tools/
+extraResources:
+  - from: scripts/reset-owner-password.mjs
+    to: tools/reset-owner-password.mjs
+  - from: scripts/reset-owner-password.sh
+    to: tools/reset-owner-password.sh
+  - from: scripts/vendor/bcryptjs.cjs
+    to: tools/vendor/bcryptjs.cjs
 asarUnpack:
   - "**/node_modules/better-sqlite3/prebuilds/*.node"
 files:

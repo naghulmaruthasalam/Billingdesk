@@ -18,7 +18,17 @@ import readline from 'node:readline';
 
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
-const bcrypt = require('bcryptjs');
+// bcryptjs comes from node_modules in a source checkout; on an installed computer a vendored copy sits next to this script.
+let bcrypt;
+for (const id of ['bcryptjs', './bcryptjs.cjs', './vendor/bcryptjs.cjs']) {
+  try {
+    bcrypt = require(id);
+    break;
+  } catch {
+    /* try the next location */
+  }
+}
+if (!bcrypt) throw new Error('bcryptjs was not found (expected next to this script as bcryptjs.cjs)');
 
 const args = process.argv.slice(2);
 const opt = (name) => {
