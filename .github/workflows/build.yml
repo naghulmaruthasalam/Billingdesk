@@ -9,7 +9,8 @@ on:
 jobs:
   test:
     name: Lint, typecheck, unit tests, end-to-end (Linux)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which no longer ships the cups-pdf package this job uses for real print tests.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
