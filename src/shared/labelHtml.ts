@@ -17,20 +17,24 @@ export interface LabelLayout {
   colGapMm: number;
   rowGapMm: number;
   rollLeftMm: number;
+  /** Fine tuning for label printers: move the print up (negative) or down (positive), in mm. */
+  rollTopMm: number;
   showPrice: boolean;
   showTamil: boolean;
   showShop: boolean;
 }
 
 /** 50 x 30 mm roll label is the most common size for 203-dpi thermal label printers. */
-export const DEFAULT_LABEL_LAYOUT: LabelLayout = { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 1, colGapMm: 2, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true };
+export const DEFAULT_LABEL_LAYOUT: LabelLayout = { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 1, colGapMm: 2, rowGapMm: 2, rollLeftMm: 0, rollTopMm: 0, showPrice: true, showTamil: false, showShop: true };
 
 /** The shop's own roll: 34 x 20 mm labels, 3 across (TVS LP 46 Lite). New installs start with this layout. */
-export const SHOP_LABEL_LAYOUT: LabelLayout = { ...DEFAULT_LABEL_LAYOUT, widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0 };
+export const SHOP_LABEL_LAYOUT: LabelLayout = { ...DEFAULT_LABEL_LAYOUT, widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2, rowGapMm: 3, rollLeftMm: 0 };
+/** The first version of the shop layout (gaps were guesses); untouched copies are upgraded to the current one. */
+export const SHOP_LABEL_LAYOUT_V1: LabelLayout = { ...DEFAULT_LABEL_LAYOUT, widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0 };
 
 /** Ready-made label sizes (Settings -> Printers and Products -> Barcode labels). */
 export const LABEL_PRESETS: { id: string; label: string; layout: Partial<LabelLayout> }[] = [
-  { id: 't34x20x3', label: 'Roll 34 × 20 mm, 3 across (TVS LP 46 Lite)', layout: { kind: 'thermal', widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0 } },
+  { id: 't34x20x3', label: 'Roll 34 × 20 mm, 3 across (TVS LP 46 Lite)', layout: { kind: 'thermal', widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2, rowGapMm: 3, rollLeftMm: 0, rollTopMm: 0 } },
   { id: 't50x30', label: 'Roll label 50 × 30 mm', layout: { kind: 'thermal', widthMm: 50, heightMm: 30, rollCols: 1 } },
   { id: 't40x30', label: 'Roll label 40 × 30 mm', layout: { kind: 'thermal', widthMm: 40, heightMm: 30, rollCols: 1 } },
   { id: 't60x40', label: 'Roll label 60 × 40 mm', layout: { kind: 'thermal', widthMm: 60, heightMm: 40, rollCols: 1 } },
@@ -88,7 +92,7 @@ export interface LabelsResult {
  * HTML for a run of barcode labels. `items` is already expanded by copy count. `startAt` leaves the first N cells of an
  * A4 sheet empty so a partly used sticker sheet can be reused.
  */
-export function renderLabelsHtml(items: LabelItem[], shopName: string, layout: LabelLayout, opts: { fontBase: string; startAt?: number; /** Printer resolution: bar widths are rounded down to whole dots so they print crisp. */ dotsPerMm?: number }): LabelsResult {
+export function renderLabelsHtml(items: LabelItem[], shopName: string, layout: LabelLayout, opts: { fontBase: string; startAt?: number; /** Printer resolution: bar widths are rounded down to whole dots so they print crisp. */ dotsPerMm?: number; /** Alignment test: every cell is an outlined frame instead of a label. */ alignment?: boolean }): LabelsResult {
   const g = labelGeometry(layout);
   const W = g.labelWidthMm;
   const H = g.labelHeightMm;
@@ -116,6 +120,10 @@ export function renderLabelsHtml(items: LabelItem[], shopName: string, layout: L
       continue;
     }
     labels++;
+    if (opts.alignment) {
+      cells.push(`<div class="lb al"><div class="fr"></div><div class="tx">${cells.length % Math.max(1, layout.kind === 'thermal' ? layout.rollCols : 1) + 1}</div></div>`);
+      continue;
+    }
     const price = layout.showPrice && it.pricePaise !== null ? `<div class="pr">${esc(formatINR(it.pricePaise))}<span class="un"> / ${esc(it.unit)}</span></div>` : '';
     cells.push(
       `<div class="lb">${layout.showShop ? `<div class="sh">${esc(shopName)}</div>` : ''}<div class="nm">${esc(it.nameEn)}</div>${layout.showTamil && it.nameTa ? `<div class="ta tm">${esc(it.nameTa)}</div>` : ''}${price}<div class="bc">${ean13Svg(it.barcode, { barHeight: 30, width: mm(drawnW) })}</div></div>`,
@@ -131,6 +139,7 @@ body{font-family:'Inter','Noto Sans Tamil',sans-serif;-webkit-print-color-adjust
 .nm{font-size:${mm(2.9 * u)};font-weight:700;max-width:100%;max-height:${mm(2.9 * u * 2.3)};overflow:hidden}
 .tm{font-size:${mm(2.7 * u)};max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}
 .pr{font-size:${mm(3.5 * u)};font-weight:700;font-variant-numeric:tabular-nums}.un{font-size:${mm(2.4 * u)};font-weight:500}
+.al{position:relative;padding:0;justify-content:center}.al .fr{position:absolute;inset:0.2mm;border:0.4mm solid #000}.al .tx{font-size:${mm(4 * u)};font-weight:700;z-index:1}
 .bc{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
 .bc svg{display:block;max-width:100%;max-height:100%}
 ${

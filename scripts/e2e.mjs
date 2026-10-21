@@ -540,6 +540,40 @@ try {
         assert.equal(z.stdout.trim(), want, `label ${idx + 1} of the row must scan as ${want} (zbar: ${JSON.stringify(z.stdout)})`);
       }
     }
+    // Alignment test: two rows of outlined frames, each label cell's left edge must be a solid line at the right place
+    const beforeAlign = readdirSync(dir).filter((f) => f.endsWith('.bin')).length;
+    const al = await page.evaluate(async () => {
+      const list = await window.skb.invoke('products:list', { search: 'SK-0' });
+      const r = await window.skb.invoke('print:labels', { items: [{ productId: list.data.rows[0].id, copies: 1 }], mode: 'print', alignment: true });
+      return { ok: r.ok, err: r.error?.message };
+    });
+    assert.ok(al.ok, `alignment test failed: ${al.err}`);
+    let alFile;
+    for (let i = 0; i < 80 && !alFile; i++) {
+      await page.waitForTimeout(500);
+      const now = readdirSync(dir).filter((f) => f.endsWith('.bin')).sort();
+      if (now.length > beforeAlign) alFile = join(dir, now[now.length - 1]);
+    }
+    assert.ok(alFile, 'alignment job did not arrive');
+    const abuf = readFileSync(alFile);
+    const atext = abuf.toString('latin1');
+    assert.equal(atext.match(/PRINT 1,1/g).length, 2, 'two rows of frames');
+    let apos = 0, rowIdx = 0;
+    for (const m of atext.matchAll(/BITMAP 0,0,(\d+),(\d+),0,/g)) {
+      const abpr = Number(m[1]), ah = Number(m[2]), start = m.index + m[0].length;
+      const apx = (x, y) => (abuf[start + y * abpr + (x >> 3)] & (0x80 >> (x & 7))) === 0;
+      const dpmm = 203 / 25.4;
+      for (let idx = 0; idx < 3; idx++) {
+        const x0 = Math.round(idx * (34 + 2.5) * dpmm);
+        let black = 0;
+        for (let y = 6; y < ah - 6; y++) if (apx(x0 + 3, y)) black++;
+        assert.ok(black / (ah - 12) > 0.95, `row ${rowIdx + 1} label ${idx + 1}: the frame's left edge must be a solid line (${black}/${ah - 12})`);
+        if (idx > 0) assert.ok(!apx(x0 - 6, Math.round(ah / 2)), 'the gap between two labels must stay white');
+      }
+      rowIdx++;
+      apos = start;
+    }
+    assert.equal(rowIdx, 2);
     await page.evaluate(() => window.skb.invoke('settings:update', { patch: { 'printing.label_method': 'auto', 'labels.layout': { kind: 'thermal', widthMm: 34, heightMm: 20, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true } } }));
     await page.getByLabel('Label printer', { exact: true }).selectOption({ value: '' });
     // switch back so later steps use the normal driver queue (automatic: a normal printer goes through its driver)

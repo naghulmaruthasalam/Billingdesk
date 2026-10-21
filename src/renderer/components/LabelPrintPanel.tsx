@@ -69,14 +69,14 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
   const preset = useMemo(() => PRESETS.find((p) => Object.entries(p.layout).every(([k, v]) => layout[k as keyof LabelLayout] === v))?.id ?? 'custom', [layout]);
   const set = <K extends keyof LabelLayout>(k: K, v: LabelLayout[K]) => setLayout((l) => ({ ...l, [k]: v }));
 
-  const run = async (mode: 'print' | 'pdf') => {
+  const run = async (mode: 'print' | 'pdf', alignment = false) => {
     const choice = mode === 'print' ? await picker.choose() : {};
     if (!choice) return;
     setBusy(true);
     try {
-      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:labels', { items, layout, startAt: layout.kind === 'a4' ? startAt : 0, mode, printer: choice.printer });
+      const r = await call<{ printed?: boolean; saved?: boolean; path?: string; printer?: string | null; note?: string | null }>('print:labels', { items, layout, startAt: layout.kind === 'a4' ? startAt : 0, mode, printer: choice.printer, alignment: alignment || undefined });
       if (r.note) toast.info(r.note);
-      if (r.printed) toast.success(r.printer ? `Labels sent to ${r.printer}` : 'Labels sent to the printer');
+      if (r.printed) toast.success(alignment ? (r.printer ? `Alignment test sent to ${r.printer}` : 'Alignment test sent') : r.printer ? `Labels sent to ${r.printer}` : 'Labels sent to the printer');
       if (r.saved) toast.success(`Saved PDF: ${r.path}`);
     } catch (e) {
       toast.error(errMsg(e));
@@ -111,8 +111,9 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
             <Field label="Height (mm)"><Input inputMode="decimal" value={layout.heightMm} onChange={(e) => set('heightMm', num(e.target.value, layout.heightMm))} /></Field>
             <Field label="Labels across the roll"><Input inputMode="numeric" value={layout.rollCols} onChange={(e) => set('rollCols', Math.max(1, Math.min(4, Math.round(num(e.target.value, layout.rollCols)))))} /></Field>
             {layout.rollCols > 1 ? <Field label="Gap between labels (mm)" hint="Side to side"><Input inputMode="decimal" value={layout.colGapMm} onChange={(e) => set('colGapMm', num(e.target.value, layout.colGapMm))} /></Field> : <div />}
-            <Field label="Gap between rows (mm)" hint="Label printers only"><Input inputMode="decimal" value={layout.rowGapMm} onChange={(e) => set('rowGapMm', num(e.target.value, layout.rowGapMm))} /></Field>
+            <Field label="Gap between rows (mm)" hint="Measure it (usually 2-3). 0 = continuous paper"><Input inputMode="decimal" value={layout.rowGapMm} onChange={(e) => set('rowGapMm', num(e.target.value, layout.rowGapMm))} /></Field>
             {layout.rollCols > 1 ? <Field label="Left offset (mm)" hint="Roll edge to first label"><Input inputMode="decimal" value={layout.rollLeftMm} onChange={(e) => set('rollLeftMm', num(e.target.value, layout.rollLeftMm))} /></Field> : <div />}
+            <Field label="Move print up / down (mm)" hint="Negative = up, positive = down"><Input inputMode="decimal" value={layout.rollTopMm} onChange={(e) => set('rollTopMm', Math.max(-5, Math.min(5, num(e.target.value, layout.rollTopMm))))} /></Field>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
@@ -136,6 +137,7 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
           {prev ? <span><b>{prev.labels}</b> label{prev.labels === 1 ? '' : 's'} on <b>{prev.pages}</b> {layout.kind === 'thermal' ? 'roll label' : 'sheet'}{prev.pages === 1 ? '' : 's'}</span> : <Spinner />}
           {prev && prev.labels > 0 && <span className={thin ? 'text-warning' : 'text-muted-foreground'}>· bar width {prev.moduleMm.toFixed(2)} mm {thin ? '(too thin - use a bigger label or hide text)' : '(good for scanning)'}</span>}
           <span className="ml-auto flex gap-2">
+            {layout.kind === 'thermal' && <Button variant="outline" disabled={busy} onClick={() => void run('print', true)} title="Prints two rows of outlined frames: they should sit exactly on your labels">Alignment test</Button>}
             <Button variant="outline" disabled={busy || !prev || prev.labels === 0} onClick={() => void run('pdf')}><FileDown /> Save as PDF</Button>
             <Button disabled={busy || !prev || prev.labels === 0} onClick={() => void run('print')} data-testid="print-labels"><Printer /> Print labels</Button>
           </span>

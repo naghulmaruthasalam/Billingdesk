@@ -47,6 +47,8 @@ export const labelsRequestSchema = z.object({
   startAt: z.number().int().min(0).max(200).optional(),
   /** Layout for this run; defaults to the saved shop layout. */
   layout: labelLayoutSchema.optional(),
+  /** Print outlined frames for every label cell instead of labels, to check the roll alignment. */
+  alignment: z.boolean().optional(),
 });
 export type LabelsRequest = z.infer<typeof labelsRequestSchema>;
 
@@ -284,6 +286,13 @@ export function buildLabelsHtml(rt: Runtime, req: LabelsRequest, fontBase: strin
   const get = rt.db.prepare('SELECT sku, name_en, name_ta, unit, price_paise, barcode FROM products WHERE id = ?');
   const items: LabelItem[] = [];
   let requested = 0;
+  if (req.alignment) {
+    // two rows of frames; the contents are irrelevant
+    const cols = layout.kind === 'thermal' ? Math.max(1, layout.rollCols) : layout.cols;
+    const n = layout.kind === 'thermal' ? cols * 2 : layout.cols * layout.rows;
+    for (let i = 0; i < n; i++) items.push({ sku: 'ALIGN', nameEn: 'Alignment', nameTa: '', unit: '', pricePaise: null, barcode: '2000000000015' });
+    return { ...renderLabelsHtml(items, '', layout, { fontBase, startAt: 0, dotsPerMm, alignment: true }), requested: n };
+  }
   for (const it of req.items) {
     const r = get.get(it.productId) as { sku: string; name_en: string; name_ta: string; unit: string; price_paise: number | null; barcode: string | null } | undefined;
     if (!r) throw new AppError('NOT_FOUND', `Product ${it.productId} not found`);

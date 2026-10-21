@@ -28,6 +28,17 @@ export function rotate180(r: GrayRaster): GrayRaster {
   return { width: r.width, height: r.height, gray };
 }
 
+/** Move the picture down (positive dy) or up (negative), keeping its size; the vacated rows are white. */
+export function shiftRows(r: GrayRaster, dy: number): GrayRaster {
+  if (dy === 0) return r;
+  const gray = new Uint8Array(r.gray.length).fill(255);
+  for (let y = 0; y < r.height; y++) {
+    const ny = y + dy;
+    if (ny >= 0 && ny < r.height) gray.set(r.gray.subarray(y * r.width, (y + 1) * r.width), ny * r.width);
+  }
+  return { width: r.width, height: r.height, gray };
+}
+
 /** TSPL: SIZE/GAP once, then CLS + BITMAP + PRINT for every row. In TSPL BITMAP data a 0 bit is a black dot. */
 export function encodeTspl(job: RowJob): Buffer {
   if (job.rows.length === 0) throw new RangeError('No label rows');

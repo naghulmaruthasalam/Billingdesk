@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { encodeTspl, encodeZpl, decodeTspl, decodeZpl, rotate180 } from '../src/core/labelprint';
+import { encodeTspl, encodeZpl, decodeTspl, decodeZpl, rotate180, shiftRows } from '../src/core/labelprint';
 import { looksLabelPrinter, resolveLabelMethod } from '../src/shared/printers';
-import { renderLabelsHtml, labelGeometry, DEFAULT_LABEL_LAYOUT } from '../src/shared/labelHtml';
+import { renderLabelsHtml, labelGeometry, DEFAULT_LABEL_LAYOUT, SHOP_LABEL_LAYOUT, SHOP_LABEL_LAYOUT_V1 } from '../src/shared/labelHtml';
 
 const raster = (w: number, h: number, black: (x: number, y: number) => boolean) => {
   const gray = new Uint8Array(w * h).fill(255);
@@ -39,6 +39,17 @@ describe('TSPL / ZPL encoders', () => {
     expect(text).toContain('^LL176'); // (20 + 2) mm at 8 dots/mm
     expect(text).toContain('^GFA,12,12,3,');
     expect([...decodeZpl(buf).rows[0].gray]).toEqual([...img.gray]);
+  });
+
+  it('shiftRows moves the picture down or up and keeps its size', () => {
+    const base = raster(8, 4, (x, y) => x === 0 && y === 1);
+    const down = shiftRows(base, 2);
+    expect(down.gray[3 * 8]).toBe(0); // row 1 -> row 3
+    expect(down.gray[1 * 8]).toBe(255);
+    const up = shiftRows(base, -1);
+    expect(up.gray[0]).toBe(0); // row 1 -> row 0
+    expect(shiftRows(base, 0)).toBe(base);
+    expect(shiftRows(base, 9).gray.every((v) => v === 255)).toBe(true); // shifted out entirely
   });
 
   it('rotate180 reverses the picture', () => {
@@ -84,6 +95,14 @@ describe('roll labels several across (34 x 20 mm, 3 across)', () => {
     expect(r.moduleMm).toBeGreaterThanOrEqual(0.24);
   });
 
+  it('alignment test: two rows of numbered, outlined frames, no barcodes', () => {
+    const r = renderLabelsHtml([1, 2, 3, 4, 5, 6].map(item), '', layout, { fontBase: '.', alignment: true });
+    expect(r.pages).toBe(2);
+    expect(r.html.match(/class="lb al"/g)).toHaveLength(6);
+    expect(r.html).not.toContain('<svg');
+    expect(r.html).toContain('class="fr"');
+  });
+
   it('a single-label roll is unchanged: no row wrapper', () => {
     const r = renderLabelsHtml([item(1), item(2)], 'Shop', { ...layout, rollCols: 1 }, { fontBase: '.' });
     expect(r.html).not.toContain('class="rw"');
@@ -102,6 +121,10 @@ describe('the shop label size', () => {
     await app.call('settings:update', { patch: { 'labels.layout': DEFAULT_LABEL_LAYOUT } }); // the old generic default (50 x 30, one across)
     ensureSeeded(app.rt.db, new Date());
     expect(getSetting(app.rt.db, 'labels.layout')).toMatchObject({ widthMm: 34, heightMm: 20, rollCols: 3 });
+    await app.call('settings:update', { patch: { 'labels.layout': SHOP_LABEL_LAYOUT_V1 } }); // the first shop layout (guessed gaps)
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'labels.layout')).toMatchObject({ widthMm: 34, heightMm: 20, rollCols: 3, rowGapMm: 3, colGapMm: 2 });
+    expect(SHOP_LABEL_LAYOUT.rowGapMm).toBe(3);
     await app.call('settings:update', { patch: { 'labels.layout': { ...DEFAULT_LABEL_LAYOUT, widthMm: 45, heightMm: 25 } } });
     ensureSeeded(app.rt.db, new Date());
     expect(getSetting(app.rt.db, 'labels.layout')).toMatchObject({ widthMm: 45, heightMm: 25, rollCols: 1 });

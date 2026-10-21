@@ -4,7 +4,7 @@ import type { Ctx } from './types';
 import { audit } from './audit';
 import { isoNow } from './time';
 import { AppError } from './errors';
-import { DEFAULT_LABEL_LAYOUT, SHOP_LABEL_LAYOUT } from '../shared/labelHtml';
+import { DEFAULT_LABEL_LAYOUT, SHOP_LABEL_LAYOUT, SHOP_LABEL_LAYOUT_V1 } from '../shared/labelHtml';
 
 export const labelLayoutSchema = z.object({
   kind: z.enum(['thermal', 'a4']),
@@ -19,6 +19,7 @@ export const labelLayoutSchema = z.object({
   colGapMm: z.number().min(0).max(10).default(2),
   rowGapMm: z.number().min(0).max(10).default(2),
   rollLeftMm: z.number().min(0).max(30).default(0),
+  rollTopMm: z.number().min(-5).max(5).default(0),
   showPrice: z.boolean(),
   showTamil: z.boolean(),
   showShop: z.boolean(),
@@ -85,7 +86,7 @@ export type SettingValue<K extends SettingKey> = z.infer<(typeof SETTINGS_SCHEMA
 /** Defaults shipped in earlier builds. A database that still holds one of these (never edited by the owner) is moved to the current default. */
 export const LEGACY_DEFAULTS: Partial<Record<SettingKey, unknown[]>> = {
   // the old generic default (50 x 30 mm, one label per row); the shop's roll is 34 x 20 mm, 3 across
-  'labels.layout': [DEFAULT_LABEL_LAYOUT],
+  'labels.layout': [DEFAULT_LABEL_LAYOUT, SHOP_LABEL_LAYOUT_V1],
   'shop.name_en': ['Shree Krishna Pattasu Kadai', 'Sri Krishna Pattasu Kadai', 'Shree Krishna Crackers Shop'],
   'shop.address': [
     '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Kovaipudur, Coimbatore - 641017.',

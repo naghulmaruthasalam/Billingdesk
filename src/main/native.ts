@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, shell, type WebContents } from 'electron';
 import { mkdirSync, readFileSync, writeFileSync, rmSync, statSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { bgraToGray, encodeReceipt, THERMAL_PAPER, type GrayRaster } from '../core/escpos';
-import { encodeTspl, encodeZpl, rotate180 } from '../core/labelprint';
+import { encodeTspl, encodeZpl, rotate180, shiftRows } from '../core/labelprint';
 import { resolveReceiptMethod, resolveLabelMethod, type ReceiptMethod, type LabelMethod } from '../shared/printers';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -155,7 +155,7 @@ type RawLabelMethod = 'escpos' | 'tspl' | 'zpl';
  * Barcode labels without a printer driver, through a raw CUPS queue (`lp -o raw`): ESC/POS for thermal receipt printers (rows
  * centred on the paper, cut between labels), TSPL or ZPL for dedicated label printers (TVS LP 46, TSC, Zebra ...).
  */
-async function printRawLabels(method: RawLabelMethod, html: string, g: { pageWidthMm: number; labelHeightMm: number }, rowCount: number, ctx: { dpi: number; paper: '58mm' | '80mm'; rowGapMm: number; cut: boolean; rotate: boolean; invert: boolean }, target: PrintTarget & { note?: string }): Promise<Result> {
+async function printRawLabels(method: RawLabelMethod, html: string, g: { pageWidthMm: number; labelHeightMm: number }, rowCount: number, ctx: { dpi: number; paper: '58mm' | '80mm'; rowGapMm: number; topMm: number; cut: boolean; rotate: boolean; invert: boolean }, target: PrintTarget & { note?: string }): Promise<Result> {
   if (process.platform === 'win32') return err('VALIDATION', 'Raw label printing is available on Linux. On Windows install the printer driver and use the "driver" method.');
   const dpmm = ctx.dpi / 25.4;
   if (method === 'escpos') {
@@ -167,6 +167,7 @@ async function printRawLabels(method: RawLabelMethod, html: string, g: { pageWid
   try {
     let rows = await renderLabelRows(html, { pageWidthMm: g.pageWidthMm, labelHeightMm: g.labelHeightMm }, rowCount, ctx.dpi);
     if (ctx.rotate) rows = rows.map(rotate180);
+    if (ctx.topMm) rows = rows.map((r) => shiftRows(r, Math.round(ctx.topMm * dpmm)));
     let payload: Buffer;
     if (method === 'escpos') {
       const { dots } = THERMAL_PAPER[ctx.paper];
@@ -191,7 +192,8 @@ async function printRawLabels(method: RawLabelMethod, html: string, g: { pageWid
       });
     });
     const warn = await queueWarning(target.deviceName!);
-    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method, note: [target.note, warn].filter(Boolean).join(' ') || null });
+    const gapWarn = method !== 'escpos' && ctx.rowGapMm <= 0 ? 'The gap between rows is 0, so the printer treats the roll as continuous paper and the rows slowly drift off the labels. Measure the gap between two labels (usually 2-3 mm) and enter it in Products → Barcode labels.' : undefined;
+    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method, note: [target.note, warn, gapWarn].filter(Boolean).join(' ') || null });
   } catch (e) {
     log.error('raw label print failed', e);
     return err('INTERNAL', `Printing labels failed: ${e instanceof Error ? e.message : String(e)}. Check that the printer is on, has labels loaded and is selected in Settings → Printers.`);
@@ -426,7 +428,7 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         const paperSetting = getSetting(rt.db, 'invoice.receipt_size');
         const res =
           labelTarget && rawMethod !== 'driver'
-            ? await printRawLabels(rawMethod, built.html, g, built.pages, { dpi, paper: paperSetting === '58mm' ? '58mm' : '80mm', rowGapMm: layoutNow.rowGapMm, cut: getSetting(rt.db, 'printing.cut'), rotate: getSetting(rt.db, 'printing.label_rotate'), invert: getSetting(rt.db, 'printing.label_invert') }, labelTarget)
+            ? await printRawLabels(rawMethod, built.html, g, built.pages, { dpi, paper: paperSetting === '58mm' ? '58mm' : '80mm', rowGapMm: layoutNow.rowGapMm, topMm: layoutNow.rollTopMm ?? 0, cut: getSetting(rt.db, 'printing.cut'), rotate: getSetting(rt.db, 'printing.label_rotate'), invert: getSetting(rt.db, 'printing.label_invert') }, labelTarget)
             : await printHtml(state, built.html, page, p.mode, 'barcode-labels.pdf', labelTarget);
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };
