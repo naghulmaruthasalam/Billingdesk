@@ -1,4 +1,4 @@
-import { looksThermal, resolveReceiptMethod } from '@shared/printers';
+import { looksThermal, resolveReceiptMethod, resolveLabelMethod } from '@shared/printers';
 import { useState } from 'react';
 import { Printer, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,13 @@ export function PrintersTab() {
   const label = settings['printing.label_printer'];
   const selectedReceipt = list.find((p) => p.name === (receipt || list.find((x) => x.isDefault)?.name));
   const platform = typeof navigator !== 'undefined' && /win/i.test(navigator.platform) ? 'win32' : 'linux';
+  const selectedLabel = list.find((p) => p.name === (label || list.find((x) => x.isDefault)?.name));
+  const labelMethod = resolveLabelMethod(settings['printing.label_method'], selectedLabel, platform);
+  const labelHint =
+    labelMethod === 'tspl' ? `Label printer detected${selectedLabel ? ` (${selectedLabel.displayName})` : ''}: labels are drawn as pictures and sent in TSPL commands, no driver needed.`
+    : labelMethod === 'zpl' ? 'Labels are drawn as pictures and sent in ZPL commands, no driver needed.'
+    : labelMethod === 'escpos' ? 'Labels are sent to this receipt printer as ESC/POS pictures, centred on the paper.'
+    : 'Normal printing through the printer driver (A4 sticker sheets always use the driver).';
   const usesEscPos = resolveReceiptMethod(settings['printing.receipt_method'], selectedReceipt, platform) === 'escpos';
   const methodHint =
     settings['printing.receipt_method'] === 'auto'
@@ -86,7 +93,8 @@ export function PrintersTab() {
     try {
       const first = (await call<{ rows: ProductDTO[] }>('products:list', { activeOnly: true, limit: 1 })).rows[0];
       if (!first) throw new Error('There are no products to print a test label for.');
-      const r = await call<{ printed?: boolean; printer?: string | null; note?: string | null }>('print:labels', { items: [{ productId: first.id, copies: 1 }], mode: 'print' });
+      const cols = settings['labels.layout'].kind === 'thermal' ? settings['labels.layout'].rollCols : 1; // one full row of the roll
+      const r = await call<{ printed?: boolean; printer?: string | null; note?: string | null }>('print:labels', { items: [{ productId: first.id, copies: cols }], mode: 'print' });
       if (r.note) toast.info(r.note);
       if (r.printed) toast.success(r.printer ? `Test label sent to ${r.printer}` : 'Test label sent to the printer');
     } catch (e) {
@@ -136,6 +144,25 @@ export function PrintersTab() {
             {options(label)}
           </Select>
         </Field>
+        <Field label="How labels are sent" hint={labelHint}>
+          <Select value={settings['printing.label_method']} disabled={!manage} onChange={(e) => void save({ 'printing.label_method': e.target.value })} aria-label="How labels are sent">
+            <option value="auto">Automatic (recommended)</option>
+            <option value="driver">Printer driver (normal printers, A4 sheets)</option>
+            <option value="tspl">Label printer - TSPL (TVS LP 46, TSC ... Linux, no driver)</option>
+            <option value="zpl">Label printer - ZPL (Zebra mode, Linux, no driver)</option>
+            <option value="escpos">Receipt printer - ESC/POS (Linux, no driver)</option>
+          </Select>
+        </Field>
+        {labelMethod === 'tspl' || labelMethod === 'zpl' ? (
+          <div className="flex flex-col justify-end gap-1">
+            <Select value={String(settings['printing.label_dpi'])} disabled={!manage} onChange={(e) => void save({ 'printing.label_dpi': Number(e.target.value) as 203 | 300 })} aria-label="Label printer resolution">
+              <option value="203">203 dpi (most label printers, TVS LP 46 Lite)</option>
+              <option value="300">300 dpi</option>
+            </Select>
+            <CheckRow checked={settings['printing.label_rotate']} disabled={!manage} onChange={(v) => void save({ 'printing.label_rotate': v })} label="Labels come out upside down - rotate 180°" />
+            <CheckRow checked={settings['printing.label_invert']} disabled={!manage} onChange={(v) => void save({ 'printing.label_invert': v })} label="Labels print inverted (white on black) - swap" />
+          </div>
+        ) : <div />}
         <Field label="How receipts are sent" hint={methodHint}>
           <Select value={settings['printing.receipt_method']} disabled={!manage} onChange={(e) => void save({ 'printing.receipt_method': e.target.value })} aria-label="How receipts are sent">
             <option value="auto">Automatic (recommended)</option>

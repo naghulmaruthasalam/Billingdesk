@@ -12,13 +12,18 @@ export interface LabelLayout {
   marginTopMm: number;
   marginLeftMm: number;
   gapMm: number;
+  /** Roll labels only: labels across the roll (1-4), gap between them, gap between rows, left offset of the first label. */
+  rollCols: number;
+  colGapMm: number;
+  rowGapMm: number;
+  rollLeftMm: number;
   showPrice: boolean;
   showTamil: boolean;
   showShop: boolean;
 }
 
 /** 50 x 30 mm roll label is the most common size for 203-dpi thermal label printers. */
-export const DEFAULT_LABEL_LAYOUT: LabelLayout = { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, showPrice: true, showTamil: false, showShop: true };
+export const DEFAULT_LABEL_LAYOUT: LabelLayout = { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 1, colGapMm: 2, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true };
 
 export interface LabelItem {
   sku: string;
@@ -41,7 +46,12 @@ export const A4_MM = { w: 210, h: 297 };
 
 /** Label cell size and page capacity for a layout. A4 sheets divide the printable area into cols x rows cells. */
 export function labelGeometry(l: LabelLayout): LabelGeometry {
-  if (l.kind === 'thermal') return { pageWidthMm: l.widthMm, pageHeightMm: l.heightMm, labelWidthMm: l.widthMm, labelHeightMm: l.heightMm, perPage: 1 };
+  if (l.kind === 'thermal') {
+    const rc = Math.max(1, l.rollCols);
+    // One page = one row of the roll (rc labels side by side).
+    const pageW = rc === 1 ? l.widthMm : l.rollLeftMm + rc * l.widthMm + (rc - 1) * l.colGapMm;
+    return { pageWidthMm: pageW, pageHeightMm: l.heightMm, labelWidthMm: l.widthMm, labelHeightMm: l.heightMm, perPage: rc };
+  }
   const w = (A4_MM.w - 2 * l.marginLeftMm - (l.cols - 1) * l.gapMm) / l.cols;
   const h = (A4_MM.h - 2 * l.marginTopMm - (l.rows - 1) * l.gapMm) / l.rows;
   return { pageWidthMm: A4_MM.w, pageHeightMm: A4_MM.h, labelWidthMm: w, labelHeightMm: h, perPage: l.cols * l.rows };
@@ -64,7 +74,7 @@ export interface LabelsResult {
  * HTML for a run of barcode labels. `items` is already expanded by copy count. `startAt` leaves the first N cells of an
  * A4 sheet empty so a partly used sticker sheet can be reused.
  */
-export function renderLabelsHtml(items: LabelItem[], shopName: string, layout: LabelLayout, opts: { fontBase: string; startAt?: number }): LabelsResult {
+export function renderLabelsHtml(items: LabelItem[], shopName: string, layout: LabelLayout, opts: { fontBase: string; startAt?: number; /** Printer resolution: bar widths are rounded down to whole dots so they print crisp. */ dotsPerMm?: number }): LabelsResult {
   const g = labelGeometry(layout);
   const W = g.labelWidthMm;
   const H = g.labelHeightMm;
@@ -77,7 +87,11 @@ export function renderLabelsHtml(items: LabelItem[], shopName: string, layout: L
   const textLines = (layout.showShop ? 2.4 : 0) + 3.2 + (layout.showTamil ? 3.0 : 0) + (layout.showPrice ? 3.8 : 0);
   const barAreaH = Math.max(6, H - 2 * pad - textLines * u);
   const barSvgAspect = EAN13_TOTAL_MODULES / 47; // viewBox is 113 x 47 with barHeight 30 and text
-  const drawnW = Math.min(barW, barAreaH * barSvgAspect);
+  let drawnW = Math.min(barW, barAreaH * barSvgAspect);
+  if (opts.dotsPerMm) {
+    const moduleDots = Math.max(1, Math.floor((drawnW * opts.dotsPerMm) / EAN13_TOTAL_MODULES + 1e-6));
+    drawnW = (moduleDots * EAN13_TOTAL_MODULES) / opts.dotsPerMm;
+  }
   const moduleMm = drawnW / EAN13_TOTAL_MODULES;
 
   for (let i = 0; i < Math.max(0, opts.startAt ?? 0) && layout.kind === 'a4'; i++) cells.push(null);
@@ -107,17 +121,24 @@ body{font-family:'Inter','Noto Sans Tamil',sans-serif;-webkit-print-color-adjust
 .bc svg{display:block;max-width:100%;max-height:100%}
 ${
   layout.kind === 'thermal'
-    ? `@page{size:${mm(W)} ${mm(H)};margin:0}.lb{page-break-after:always;break-after:page}.lb:last-child{page-break-after:auto;break-after:auto}`
+    ? `@page{size:${mm(g.pageWidthMm)} ${mm(H)};margin:0}.lb{page-break-after:always;break-after:page}.lb:last-child{page-break-after:auto;break-after:auto}.rw{display:flex;gap:${mm(layout.colGapMm)};padding-left:${mm(layout.rollLeftMm)};width:${mm(g.pageWidthMm)};height:${mm(H)};overflow:hidden;page-break-after:always;break-after:page}.rw:last-child{page-break-after:auto;break-after:auto}.rw .lb{page-break-after:auto;break-after:auto}`
     : `@page{size:A4;margin:0}.sheet{width:210mm;height:297mm;padding:${mm(layout.marginTopMm)} ${mm(layout.marginLeftMm)};display:grid;grid-template-columns:repeat(${layout.cols},${mm(W)});grid-auto-rows:${mm(H)};gap:${mm(layout.gapMm)};align-content:start;justify-content:start;page-break-after:always;break-after:page;overflow:hidden}.sheet:last-child{page-break-after:auto;break-after:auto}.blank{width:${mm(W)};height:${mm(H)}}`
 }
-@media screen{body{background:#e9e6dc}${layout.kind === 'thermal' ? '.lb{margin:6px auto;box-shadow:0 0 0 1px #bbb}' : '.sheet{margin:8px auto;box-shadow:0 0 0 1px #bbb;background:#fff}'}}
+@media screen{body{background:#e9e6dc}${layout.kind === 'thermal' ? '.lb{margin:6px auto;box-shadow:0 0 0 1px #bbb}.rw{margin:6px auto;box-shadow:0 0 0 1px #bbb;background:#fff}.rw .lb{margin:0;box-shadow:none;outline:0.1mm dotted #ddd}' : '.sheet{margin:8px auto;box-shadow:0 0 0 1px #bbb;background:#fff}'}}
 `;
 
   let body = '';
   let pages = 0;
   if (layout.kind === 'thermal') {
-    body = cells.filter((c): c is string => c !== null).join('');
-    pages = labels;
+    const live = cells.filter((c): c is string => c !== null);
+    if (g.perPage > 1) {
+      // several labels across the roll: one flex row per printed row
+      for (let i = 0; i < live.length; i += g.perPage) body += `<div class="rw">${live.slice(i, i + g.perPage).join('')}</div>`;
+      pages = Math.ceil(live.length / g.perPage);
+    } else {
+      body = live.join('');
+      pages = labels;
+    }
   } else {
     const per = g.perPage;
     pages = Math.max(1, Math.ceil(cells.length / per));

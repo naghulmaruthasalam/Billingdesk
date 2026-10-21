@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, shell, type WebContents } from 'electron';
 import { mkdirSync, readFileSync, writeFileSync, rmSync, statSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { bgraToGray, encodeReceipt, THERMAL_PAPER } from '../core/escpos';
-import { resolveReceiptMethod, type ReceiptMethod } from '../shared/printers';
+import { bgraToGray, encodeReceipt, THERMAL_PAPER, type GrayRaster } from '../core/escpos';
+import { encodeTspl, encodeZpl, rotate180 } from '../core/labelprint';
+import { resolveReceiptMethod, resolveLabelMethod, type ReceiptMethod, type LabelMethod } from '../shared/printers';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
@@ -108,23 +109,18 @@ async function printEscPos(_state: NativeState, html: string, size: '58mm' | '80
 }
 
 /**
- * Barcode labels on a thermal receipt printer (RP-3200, TM-T20, ...) without a driver: every label is drawn at the
- * printer's resolution (203 dpi = 8 dots/mm), centred on the paper width and sent as ESC/POS raster, one label after the
- * other (cut between labels when "cut" is on). Label printers that speak TSPL/ZPL are not covered by this mode.
+ * Draw the label rows (one printed row of the roll per image) in an offscreen window at the printer's resolution. The label
+ * HTML stacks the rows vertically; each row is brought into view by scrolling and captured.
  */
-async function printEscPosLabels(html: string, g: { labelWidthMm: number; labelHeightMm: number }, count: number, paper: '58mm' | '80mm', target: PrintTarget & { note?: string }, cut: boolean): Promise<Result> {
-  if (process.platform === 'win32') return err('VALIDATION', 'Thermal (ESC/POS) mode is available on Linux. On Windows install the printer driver and use the "driver" method.');
-  const DPMM = 8;
-  const { dots, printableMm } = THERMAL_PAPER[paper];
-  const wDots = Math.round(g.labelWidthMm * DPMM);
-  const hDots = Math.round(g.labelHeightMm * DPMM);
-  if (wDots > dots) return err('VALIDATION', `The labels are ${g.labelWidthMm} mm wide but the ${paper} paper prints at most ${printableMm} mm. Choose a narrower label size in Products → Barcode labels.`);
-  const zoom = DPMM / (96 / 25.4);
-  const cssLabelH = (g.labelHeightMm * 96) / 25.4;
+async function renderLabelRows(html: string, geo: { pageWidthMm: number; labelHeightMm: number }, count: number, dpi: number): Promise<GrayRaster[]> {
+  const dpmm = dpi / 25.4;
+  const wDots = Math.round(geo.pageWidthMm * dpmm);
+  const hDots = Math.round(geo.labelHeightMm * dpmm);
+  const zoom = dpi / 96;
+  const cssRowH = (geo.labelHeightMm * 96) / 25.4;
   mkdirSync(tempDir(), { recursive: true });
   const stamp = `${process.pid}-${Date.now()}`;
   const htmlFile = join(tempDir(), `labels-${stamp}.html`);
-  const binFile = join(tempDir(), `labels-${stamp}.bin`);
   writeFileSync(htmlFile, html, 'utf8');
   const win = new BrowserWindow({ show: false, width: wDots, height: hDots, useContentSize: true, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, zoomFactor: zoom } });
   win.webContents.on('render-process-gone', (_e, d) => log.error('label renderer gone', d));
@@ -132,24 +128,62 @@ async function printEscPosLabels(html: string, g: { labelWidthMm: number; labelH
     win.webContents.setFrameRate(5);
     await win.loadFile(htmlFile);
     win.webContents.setZoomFactor(zoom);
-    await win.webContents.insertCSS('.lb{margin:0 !important;box-shadow:none !important}html,body{background:#fff !important;overflow:hidden}');
+    await win.webContents.insertCSS('.lb:not(.rw .lb){margin:0 !important;box-shadow:none !important}.rw{margin:0 !important;box-shadow:none !important}.rw .lb{outline:none !important}html,body{background:#fff !important;overflow:hidden}');
     await win.webContents.executeJavaScript('document.fonts ? document.fonts.ready.then(() => true) : true');
     win.setContentSize(wDots, hDots);
     await new Promise((res) => setTimeout(res, 600));
-    const left = (dots - wDots) >> 1;
-    const parts: Buffer[] = [];
+    const rows: GrayRaster[] = [];
     for (let i = 0; i < count; i++) {
-      await win.webContents.executeJavaScript(`window.scrollTo(0, ${i * cssLabelH})`);
+      await win.webContents.executeJavaScript(`window.scrollTo(0, ${i * cssRowH})`);
       await new Promise((res) => setTimeout(res, 160));
       const img = await win.webContents.capturePage();
       const sz = img.getSize();
       if (sz.width !== wDots || sz.height < hDots) throw new Error(`Label image has an unexpected size ${sz.width}x${sz.height}`);
       const gray = bgraToGray(img.toBitmap(), sz.width, sz.height);
-      const page = new Uint8Array(dots * hDots).fill(255); // white, label centred
-      for (let y = 0; y < hDots; y++) page.set(gray.gray.subarray(y * wDots, (y + 1) * wDots), y * dots + left);
-      parts.push(encodeReceipt({ width: dots, height: hDots, gray: page }, { cut, copies: 1, feedLines: 2 }));
+      rows.push({ width: wDots, height: hDots, gray: gray.gray.subarray(0, wDots * hDots) });
     }
-    writeFileSync(binFile, Buffer.concat(parts));
+    return rows;
+  } finally {
+    win.destroy();
+    rmSync(htmlFile, { force: true });
+  }
+}
+
+type RawLabelMethod = 'escpos' | 'tspl' | 'zpl';
+
+/**
+ * Barcode labels without a printer driver, through a raw CUPS queue (`lp -o raw`): ESC/POS for thermal receipt printers (rows
+ * centred on the paper, cut between labels), TSPL or ZPL for dedicated label printers (TVS LP 46, TSC, Zebra ...).
+ */
+async function printRawLabels(method: RawLabelMethod, html: string, g: { pageWidthMm: number; labelHeightMm: number }, rowCount: number, ctx: { dpi: number; paper: '58mm' | '80mm'; rowGapMm: number; cut: boolean; rotate: boolean; invert: boolean }, target: PrintTarget & { note?: string }): Promise<Result> {
+  if (process.platform === 'win32') return err('VALIDATION', 'Raw label printing is available on Linux. On Windows install the printer driver and use the "driver" method.');
+  const dpmm = ctx.dpi / 25.4;
+  if (method === 'escpos') {
+    const { dots, printableMm } = THERMAL_PAPER[ctx.paper];
+    if (Math.round(g.pageWidthMm * dpmm) > dots) return err('VALIDATION', `The label row is ${Math.round(g.pageWidthMm)} mm wide but the ${ctx.paper} paper prints at most ${printableMm} mm. Choose a narrower label in Products → Barcode labels, or use a label printer.`);
+  }
+  mkdirSync(tempDir(), { recursive: true });
+  const binFile = join(tempDir(), `labels-${process.pid}-${Date.now()}.bin`);
+  try {
+    let rows = await renderLabelRows(html, { pageWidthMm: g.pageWidthMm, labelHeightMm: g.labelHeightMm }, rowCount, ctx.dpi);
+    if (ctx.rotate) rows = rows.map(rotate180);
+    let payload: Buffer;
+    if (method === 'escpos') {
+      const { dots } = THERMAL_PAPER[ctx.paper];
+      const w = rows[0].width;
+      const left = (dots - w) >> 1;
+      payload = Buffer.concat(
+        rows.map((r) => {
+          const page = new Uint8Array(dots * r.height).fill(255); // white, label row centred on the paper
+          for (let y = 0; y < r.height; y++) page.set(r.gray.subarray(y * w, (y + 1) * w), y * dots + left);
+          return encodeReceipt({ width: dots, height: r.height, gray: page }, { cut: ctx.cut, copies: 1, feedLines: 2 });
+        }),
+      );
+    } else {
+      const job = { rows, widthMm: g.pageWidthMm, heightMm: g.labelHeightMm, gapMm: ctx.rowGapMm, invert: ctx.invert };
+      payload = method === 'tspl' ? encodeTspl(job) : encodeZpl(job, dpmm);
+    }
+    writeFileSync(binFile, payload);
     await new Promise<void>((resolve, reject) => {
       execFile('lp', ['-d', target.deviceName!, '-o', 'raw', '-t', 'Labels', binFile], { timeout: 60000 }, (e, _out, stderr) => {
         if (e) reject(new Error((stderr || e.message).trim()));
@@ -157,16 +191,12 @@ async function printEscPosLabels(html: string, g: { labelWidthMm: number; labelH
       });
     });
     const warn = await queueWarning(target.deviceName!);
-    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method: 'escpos', note: [target.note, warn].filter(Boolean).join(' ') || null });
+    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method, note: [target.note, warn].filter(Boolean).join(' ') || null });
   } catch (e) {
-    log.error('ESC/POS label print failed', e);
-    return err('INTERNAL', `Printing labels failed: ${e instanceof Error ? e.message : String(e)}. Check that the printer is on, has paper and is selected in Settings → Printers.`);
+    log.error('raw label print failed', e);
+    return err('INTERNAL', `Printing labels failed: ${e instanceof Error ? e.message : String(e)}. Check that the printer is on, has labels loaded and is selected in Settings → Printers.`);
   } finally {
-    setTimeout(() => {
-      if (!win.isDestroyed()) win.destroy();
-      rmSync(htmlFile, { force: true });
-      rmSync(binFile, { force: true });
-    }, 4000);
+    setTimeout(() => rmSync(binFile, { force: true }), 4000);
   }
 }
 
@@ -214,6 +244,12 @@ async function receiptMethodFor(rt: Runtime, state: NativeState, target: PrintTa
   if (method !== 'auto') return method;
   const printer = (await listPrinters(state)).find((p) => p.name === target?.deviceName);
   return resolveReceiptMethod(method, printer, process.platform);
+}
+
+/** Decide how labels reach the chosen printer: driver, ESC/POS (receipt printers), TSPL or ZPL (label printers). */
+async function labelMethodFor(rt: Runtime, state: NativeState, target: PrintTarget | undefined): Promise<'driver' | 'escpos' | 'tspl' | 'zpl'> {
+  const printer = (await listPrinters(state)).find((p) => p.name === target?.deviceName);
+  return resolveLabelMethod(getSetting(rt.db, 'printing.label_method') as LabelMethod, printer, process.platform);
 }
 
 async function resolveTarget(rt: Runtime, state: NativeState, kind: 'receipt' | 'label', override?: string): Promise<PrintTarget & { note?: string }> {
@@ -377,17 +413,20 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         if (!u.permissions.includes('products.view')) throw new AppError('FORBIDDEN', 'You do not have permission to print labels');
         const p = labelsRequestSchema.extend({ mode: z.enum(['print', 'pdf']), printer: z.string().max(200).optional() }).parse(payload);
         const fontBase = pathToFileURL(join(state.rendererRoot, 'fonts')).toString();
-        const built = buildLabelsHtml(rt, p, fontBase);
+        const labelTarget = p.mode === 'print' ? await resolveTarget(rt, state, 'label', p.printer) : undefined;
+        const a4Layout = p.layout?.kind === 'a4' || (!p.layout && getSetting(rt.db, 'labels.layout').kind === 'a4');
+        const rawMethod = labelTarget && !a4Layout ? await labelMethodFor(rt, state, labelTarget) : 'driver';
+        const dpi = getSetting(rt.db, 'printing.label_dpi');
+        // Raw modes draw the bars in whole printer dots, so the HTML is built for the printer's resolution.
+        const built = buildLabelsHtml(rt, p, fontBase, rawMethod !== 'driver' ? dpi / 25.4 : undefined);
         if (built.labels === 0) return err('VALIDATION', 'None of the selected products has a printable barcode.');
         const g = built.geometry;
-        const page: PrintPage = p.layout?.kind === 'a4' || (!p.layout && getSetting(rt.db, 'labels.layout').kind === 'a4') ? { kind: 'a4-exact' } : { kind: 'exact', widthMicrons: Math.round(g.pageWidthMm * 1000), heightMicrons: Math.round(g.pageHeightMm * 1000) };
-        const labelTarget = p.mode === 'print' ? await resolveTarget(rt, state, 'label', p.printer) : undefined;
-        const roll = p.layout?.kind !== 'a4' && !(!p.layout && getSetting(rt.db, 'labels.layout').kind === 'a4');
+        const layoutNow = p.layout ?? getSetting(rt.db, 'labels.layout');
+        const page: PrintPage = a4Layout ? { kind: 'a4-exact' } : { kind: 'exact', widthMicrons: Math.round(g.pageWidthMm * 1000), heightMicrons: Math.round(g.pageHeightMm * 1000) };
         const paperSetting = getSetting(rt.db, 'invoice.receipt_size');
-        // Thermal receipt printers (text-only / raw queues) cannot print a page through their driver: send roll labels as ESC/POS too.
         const res =
-          labelTarget && roll && (await receiptMethodFor(rt, state, labelTarget)) === 'escpos'
-            ? await printEscPosLabels(built.html, g, built.labels, paperSetting === '58mm' ? '58mm' : '80mm', labelTarget, getSetting(rt.db, 'printing.cut'))
+          labelTarget && rawMethod !== 'driver'
+            ? await printRawLabels(rawMethod, built.html, g, built.pages, { dpi, paper: paperSetting === '58mm' ? '58mm' : '80mm', rowGapMm: layoutNow.rowGapMm, cut: getSetting(rt.db, 'printing.cut'), rotate: getSetting(rt.db, 'printing.label_rotate'), invert: getSetting(rt.db, 'printing.label_invert') }, labelTarget)
             : await printHtml(state, built.html, page, p.mode, 'barcode-labels.pdf', labelTarget);
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };

@@ -15,6 +15,10 @@ export const labelLayoutSchema = z.object({
   marginTopMm: z.number().min(0).max(30),
   marginLeftMm: z.number().min(0).max(30),
   gapMm: z.number().min(0).max(10),
+  rollCols: z.number().int().min(1).max(4).default(1),
+  colGapMm: z.number().min(0).max(10).default(2),
+  rowGapMm: z.number().min(0).max(10).default(2),
+  rollLeftMm: z.number().min(0).max(30).default(0),
   showPrice: z.boolean(),
   showTamil: z.boolean(),
   showShop: z.boolean(),
@@ -63,6 +67,12 @@ export const SETTINGS_SCHEMA = {
   'printing.auto_print': z.boolean(),
   /** 'driver': print through the printer driver. 'escpos': draw the receipt as an image and send ESC/POS commands (thermal receipt printers; no driver needed). */
   'printing.receipt_method': z.enum(['auto', 'driver', 'escpos']),
+  /** How barcode labels are sent: through the driver, or as raw ESC/POS (receipt printers), TSPL or ZPL (label printers). */
+  'printing.label_method': z.enum(['auto', 'driver', 'escpos', 'tspl', 'zpl']),
+  'printing.label_dpi': z.union([z.literal(203), z.literal(300)]),
+  /** Troubleshooting for raw label printers: print the image rotated 180 degrees / with black and white swapped. */
+  'printing.label_rotate': z.boolean(),
+  'printing.label_invert': z.boolean(),
   /** Cut the paper after each receipt in ESC/POS mode. */
   'printing.cut': z.boolean(),
   'auth.recovery_hash': z.string().max(200),
@@ -125,6 +135,10 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'printing.receipt_copies': 1,
   'printing.auto_print': false,
   'printing.receipt_method': 'auto',
+  'printing.label_method': 'auto',
+  'printing.label_dpi': 203,
+  'printing.label_rotate': false,
+  'printing.label_invert': false,
   'printing.cut': true,
   'auth.recovery_hash': '',
   'catalogue.seeded': false,

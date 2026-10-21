@@ -24,9 +24,10 @@ interface Preview {
 }
 
 const PRESETS: { id: string; label: string; layout: Partial<LabelLayout> }[] = [
-  { id: 't50x30', label: 'Roll label 50 × 30 mm', layout: { kind: 'thermal', widthMm: 50, heightMm: 30 } },
-  { id: 't40x30', label: 'Roll label 40 × 30 mm', layout: { kind: 'thermal', widthMm: 40, heightMm: 30 } },
-  { id: 't60x40', label: 'Roll label 60 × 40 mm', layout: { kind: 'thermal', widthMm: 60, heightMm: 40 } },
+  { id: 't50x30', label: 'Roll label 50 × 30 mm', layout: { kind: 'thermal', widthMm: 50, heightMm: 30, rollCols: 1 } },
+  { id: 't40x30', label: 'Roll label 40 × 30 mm', layout: { kind: 'thermal', widthMm: 40, heightMm: 30, rollCols: 1 } },
+  { id: 't60x40', label: 'Roll label 60 × 40 mm', layout: { kind: 'thermal', widthMm: 60, heightMm: 40, rollCols: 1 } },
+  { id: 't34x20x3', label: 'Roll 34 × 20 mm, 3 across (TVS LP 46 Lite)', layout: { kind: 'thermal', widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0 } },
   { id: 'a24', label: 'A4 sticker sheet 3 × 8 (24 labels)', layout: { kind: 'a4', cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0 } },
   { id: 'a40', label: 'A4 sticker sheet 4 × 10 (40 labels)', layout: { kind: 'a4', cols: 4, rows: 10, marginTopMm: 10, marginLeftMm: 5, gapMm: 0 } },
   { id: 'a21', label: 'A4 sticker sheet 3 × 7 (21 labels)', layout: { kind: 'a4', cols: 3, rows: 7, marginTopMm: 15, marginLeftMm: 7, gapMm: 0 } },
@@ -116,6 +117,10 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
           <div className="grid grid-cols-2 gap-2">
             <Field label="Width (mm)"><Input inputMode="decimal" value={layout.widthMm} onChange={(e) => set('widthMm', num(e.target.value, layout.widthMm))} /></Field>
             <Field label="Height (mm)"><Input inputMode="decimal" value={layout.heightMm} onChange={(e) => set('heightMm', num(e.target.value, layout.heightMm))} /></Field>
+            <Field label="Labels across the roll"><Input inputMode="numeric" value={layout.rollCols} onChange={(e) => set('rollCols', Math.max(1, Math.min(4, Math.round(num(e.target.value, layout.rollCols)))))} /></Field>
+            {layout.rollCols > 1 ? <Field label="Gap between labels (mm)" hint="Side to side"><Input inputMode="decimal" value={layout.colGapMm} onChange={(e) => set('colGapMm', num(e.target.value, layout.colGapMm))} /></Field> : <div />}
+            <Field label="Gap between rows (mm)" hint="Label printers only"><Input inputMode="decimal" value={layout.rowGapMm} onChange={(e) => set('rowGapMm', num(e.target.value, layout.rowGapMm))} /></Field>
+            {layout.rollCols > 1 ? <Field label="Left offset (mm)" hint="Roll edge to first label"><Input inputMode="decimal" value={layout.rollLeftMm} onChange={(e) => set('rollLeftMm', num(e.target.value, layout.rollLeftMm))} /></Field> : <div />}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
@@ -131,7 +136,7 @@ export function LabelPrintPanel({ items, previewHeight = '46vh' }: { items: Labe
         <CheckRow checked={layout.showTamil} onChange={(v) => set('showTamil', v)} label="Tamil name" />
         <CheckRow checked={layout.showPrice} onChange={(v) => set('showPrice', v)} label="Price" />
         {can('settings.manage') && <Button variant="outline" size="sm" onClick={() => void saveDefault()}><Save /> Save as shop default</Button>}
-        <p className="text-xs text-muted-foreground">Install your label printer's driver and pick the same paper size in its settings (margins zero). You choose the printer when you press Print (or set it in Settings → Printers).</p>
+        <p className="text-xs text-muted-foreground">Label printers (TVS LP 46, TSC, Zebra ...) are detected and driven directly on Linux; elsewhere install the printer's driver and pick the same paper size with zero margins. You choose the printer when you press Print (or set it in Settings → Printers).</p>
       </div>
 
       <div className="flex min-w-0 flex-col gap-2">

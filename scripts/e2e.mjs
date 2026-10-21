@@ -468,6 +468,76 @@ try {
       const z = spawnSync('zbarimg', ['-q', '--raw', '-Sdisable', '-Sean13.enable', lpbm], { encoding: 'utf8' });
       assert.match(z.stdout.trim(), /^\d{13}$/, `the barcode on the thermal label must scan (zbar said: ${JSON.stringify(z.stdout)} ${z.stderr})`);
     }
+    // Several labels in one job (copies + different products): every label must be its own, correctly positioned image
+    const multi = await page.evaluate(async () => {
+      const list = await window.skb.invoke('products:list', { search: 'SK-0' });
+      const rows = list.data.rows.filter((r) => r.barcode).slice(0, 2);
+      const r = await window.skb.invoke('print:labels', { items: [{ productId: rows[0].id, copies: 1 }, { productId: rows[1].id, copies: 2 }], mode: 'print' });
+      return { ok: r.ok, err: r.error?.message, codes: [rows[0].barcode, rows[1].barcode, rows[1].barcode] };
+    });
+    assert.ok(multi.ok, `multi-label print failed: ${multi.err}`);
+    let multiFile;
+    for (let i = 0; i < 80 && !multiFile; i++) {
+      await page.waitForTimeout(500);
+      const now = readdirSync(dir).filter((f) => f.endsWith('.bin')).sort();
+      if (now.length > beforeLabel + 1) multiFile = join(dir, now[now.length - 1]);
+    }
+    assert.ok(multiFile, 'multi-label job did not arrive');
+    const mbuf = readFileSync(multiFile);
+    let mi = 2, mrows = 0; const mparts = [];
+    while (mi < mbuf.length) {
+      if (mbuf[mi] === 0x1d && mbuf[mi + 1] === 0x76) { const bpr = mbuf[mi + 4] | (mbuf[mi + 5] << 8), h = mbuf[mi + 6] | (mbuf[mi + 7] << 8); mparts.push(mbuf.subarray(mi + 8, mi + 8 + bpr * h)); mrows += h; mi += 8 + bpr * h; }
+      else if (mbuf[mi] === 0x1b && mbuf[mi + 1] === 0x64) mi += 3;
+      else if (mbuf[mi] === 0x1d && mbuf[mi + 1] === 0x56) mi += 3;
+      else if (mbuf[mi] === 0x1b && mbuf[mi + 1] === 0x40) mi += 2;
+      else break;
+    }
+    assert.equal(mrows, 3 * 240, 'three 30 mm labels = 720 rows');
+    const mpbm = join(out, 'escpos-labels-3.pbm');
+    writeFileSync(mpbm, Buffer.concat([Buffer.from(`P4\n576 ${mrows}\n`), ...mparts]));
+    if (hasTool('zbarimg')) {
+      const z = spawnSync('zbarimg', ['-q', '--raw', '-Sdisable', '-Sean13.enable', mpbm], { encoding: 'utf8' });
+      // (zbar reports a repeated identical symbol once, so compare the distinct codes; the row count above proves three labels)
+      assert.deepEqual([...new Set(z.stdout.trim().split('\n').filter((l) => /^\d{13}$/.test(l)))].sort(), [...new Set(multi.codes)].sort(), `the labels must scan as ${multi.codes} (zbar: ${JSON.stringify(z.stdout)})`);
+    }
+    // Dedicated label printer (TVS LP 46 Lite, 34 x 20 mm labels, 3 across): TSPL bitmap job through the raw queue
+    const tspl = await page.evaluate(async () => {
+      await window.skb.invoke('settings:update', { patch: { 'printing.label_method': 'tspl', 'labels.layout': { kind: 'thermal', widthMm: 34, heightMm: 20, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: false } } });
+      const list = await window.skb.invoke('products:list', { search: 'SK-0' });
+      const rows = list.data.rows.filter((r) => r.barcode).slice(0, 2);
+      const r = await window.skb.invoke('print:labels', { items: [{ productId: rows[0].id, copies: 1 }, { productId: rows[1].id, copies: 2 }], mode: 'print' });
+      return { ok: r.ok, err: r.error?.message, codes: [rows[0].barcode, rows[1].barcode, rows[1].barcode] };
+    });
+    assert.ok(tspl.ok, `TSPL label print failed: ${tspl.err}`);
+    let tsplFile;
+    for (let i = 0; i < 80 && !tsplFile; i++) {
+      await page.waitForTimeout(500);
+      const now = readdirSync(dir).filter((f) => f.endsWith('.bin')).sort();
+      if (now.length > beforeLabel + 2) tsplFile = join(dir, now[now.length - 1]);
+    }
+    assert.ok(tsplFile, 'TSPL job did not arrive');
+    const tbuf = readFileSync(tsplFile);
+    const ttext = tbuf.toString('latin1');
+    assert.match(ttext, /^SIZE 107 mm,20 mm\r\nGAP 2 mm,0 mm\r\n/, 'TSPL header: one row = 3 x 34 mm + 2 gaps, 2 mm between rows');
+    const bm = /BITMAP 0,0,(\d+),(\d+),0,/.exec(ttext);
+    assert.ok(bm, 'TSPL BITMAP command');
+    const bpr = Number(bm[1]), bh = Number(bm[2]);
+    assert.equal(bh, 160, '20 mm at 203 dpi = 160 dots');
+    assert.equal(ttext.match(/PRINT 1,1/g).length, 1, 'three labels fit one row = one PRINT');
+    const dataStart = bm.index + bm[0].length;
+    const px = (x, y) => (tbuf[dataStart + y * bpr + (x >> 3)] & (0x80 >> (x & 7))) === 0; // TSPL: 0 bit = black
+    writeFileSync(join(out, 'tspl-row.pbm'), Buffer.concat([Buffer.from(`P1\n${bpr * 8} ${bh}\n`), Buffer.from(Array.from({ length: bh }, (_, y) => Array.from({ length: bpr * 8 }, (_, x) => (px(x, y) ? '1' : '0')).join('')).join('\n'))]));
+    if (hasTool('zbarimg')) {
+      const pitch = (34 + 2.5) * 203 / 25.4; // dots from one label to the next
+      for (const [idx, want] of [[0, tspl.codes[0]], [1, tspl.codes[1]], [2, tspl.codes[2]]]) {
+        const x0 = Math.round(idx * pitch), x1 = Math.min(bpr * 8, Math.round(x0 + 34 * 203 / 25.4));
+        const crop = join(out, `tspl-label-${idx}.pbm`);
+        writeFileSync(crop, `P1\n${x1 - x0} ${bh}\n` + Array.from({ length: bh }, (_, y) => Array.from({ length: x1 - x0 }, (_, x) => (px(x0 + x, y) ? '1' : '0')).join('')).join('\n'));
+        const z = spawnSync('zbarimg', ['-q', '--raw', '-Sdisable', '-Sean13.enable', crop], { encoding: 'utf8' });
+        assert.equal(z.stdout.trim(), want, `label ${idx + 1} of the row must scan as ${want} (zbar: ${JSON.stringify(z.stdout)})`);
+      }
+    }
+    await page.evaluate(() => window.skb.invoke('settings:update', { patch: { 'printing.label_method': 'auto', 'labels.layout': { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 1, colGapMm: 2, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true } } }));
     await page.getByLabel('Label printer', { exact: true }).selectOption({ value: '' });
     // switch back so later steps use the normal driver queue (automatic: a normal printer goes through its driver)
     await page.getByLabel('How receipts are sent').selectOption({ value: 'auto' });

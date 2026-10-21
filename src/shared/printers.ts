@@ -26,3 +26,25 @@ export function resolveReceiptMethod(method: ReceiptMethod, printer: PrinterIden
   if (method === 'escpos') return 'escpos';
   return platform !== 'win32' && looksThermal(printer) ? 'escpos' : 'driver';
 }
+
+/**
+ * True for dedicated barcode-LABEL printers (TVS LP 46, TSC TTP/TE, Zebra ZD/GK, Xprinter XP-365B ...). They speak TSPL or ZPL,
+ * not ESC/POS, and are fed die-cut label rolls.
+ */
+export function looksLabelPrinter(p: PrinterIdentity | undefined): boolean {
+  if (!p) return false;
+  return /(?<![A-Za-z])(LP[ _-]?\d{2}|TSC|TTP|TE[ _-]?\d{3}|ZEBRA|ZD\d|GK\d|GX\d|GC\d|DT[ _-]?\d{3}|XP[ _-]?[34]\d\dB|label|barcode)/i.test(`${p.name} ${p.displayName ?? ''} ${p.model ?? ''}`);
+}
+
+export type LabelMethod = 'auto' | 'driver' | 'escpos' | 'tspl' | 'zpl';
+
+/**
+ * How barcode labels reach a printer. Automatic: label printers get TSPL, thermal receipt printers get ESC/POS, everything
+ * else prints through its driver. Raw modes need the Linux print system (CUPS), so Windows always uses the driver.
+ */
+export function resolveLabelMethod(method: LabelMethod, printer: PrinterIdentity | undefined, platform: string): 'driver' | 'escpos' | 'tspl' | 'zpl' {
+  if (platform === 'win32') return 'driver';
+  if (method !== 'auto') return method;
+  if (looksLabelPrinter(printer)) return 'tspl';
+  return looksThermal(printer) ? 'escpos' : 'driver';
+}

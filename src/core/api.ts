@@ -279,7 +279,7 @@ const HANDLERS: Record<string, Handler> = {
 
 
 /** Build barcode-label HTML for the requested products. Shared by the in-app preview and the native print path. */
-export function buildLabelsHtml(rt: Runtime, req: LabelsRequest, fontBase: string): LabelsResult & { requested: number } {
+export function buildLabelsHtml(rt: Runtime, req: LabelsRequest, fontBase: string, dotsPerMm?: number): LabelsResult & { requested: number } {
   const layout = req.layout ?? settings.getSetting(rt.db, 'labels.layout');
   const get = rt.db.prepare('SELECT sku, name_en, name_ta, unit, price_paise, barcode FROM products WHERE id = ?');
   const items: LabelItem[] = [];
@@ -291,7 +291,7 @@ export function buildLabelsHtml(rt: Runtime, req: LabelsRequest, fontBase: strin
     if (requested > 5000) throw new AppError('VALIDATION', 'At most 5000 labels can be printed in one run');
     for (let i = 0; i < it.copies; i++) items.push({ sku: r.sku, nameEn: r.name_en, nameTa: r.name_ta, unit: r.unit, pricePaise: r.price_paise, barcode: r.barcode });
   }
-  const res = renderLabelsHtml(items, settings.getSetting(rt.db, 'shop.name_en'), layout, { fontBase, startAt: req.startAt });
+  const res = renderLabelsHtml(items, settings.getSetting(rt.db, 'shop.name_en'), layout, { fontBase, startAt: req.startAt, dotsPerMm });
   return { ...res, requested };
 }
 

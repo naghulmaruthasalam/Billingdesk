@@ -157,6 +157,16 @@ If a saved printer is unplugged or uninstalled, billing is never blocked: the ap
 
 On Linux add the printer first in *Settings → Printers* or at `http://localhost:631` (CUPS); check with `lpstat -p`. The end-to-end run sets up a real CUPS queue (`CUPS-PDF`) and verifies a receipt printed through the Choose-printer window (and that the app stays open), silent test receipt, silent test label (barcode decoded) and auto-print after a sale (`E2E_PRINTER=CUPS-PDF`).
 
+### Barcode label printers (TVS LP 46 Lite, TSC, Zebra ...) on Linux
+
+Dedicated label printers speak **TSPL** (TVS, TSC) or **ZPL** (Zebra mode), not ESC/POS. The app draws every row of labels as a picture at the printer's resolution and sends it as a TSPL/ZPL bitmap through a raw print queue - no driver needed - and supports several labels **across** the roll (for example 34 × 20 mm, 3 across, in *Products → Barcode labels → "Roll 34 × 20 mm, 3 across (TVS LP 46 Lite)"*). Bar widths are rounded to whole printer dots so the barcode scans.
+
+1. Connect the printer by USB and switch it on. Load the label roll and run its media auto-detect (hold the FEED/pause button until it feeds a few labels).
+2. Create a queue: `lpinfo -v | grep -i usb` shows the printer's address (like `usb://TVS/LP%2046%20Lite?serial=...`); then `sudo lpadmin -p LP46-LITE -E -v "usb://TVS/LP%2046%20Lite?serial=..." -m raw` (or add it in the system Printers settings with any driver - the app sends raw data).
+3. *Settings → Printers*: press **Refresh**, choose it as **Barcode label printer**. *How labels are sent* = **Automatic** (names like LP-46, TSC, Zebra, XP-365B are detected) or **TSPL** (TVS/TSC) / **ZPL** (if the printer is switched to Zebra emulation).
+4. *Products → Barcode labels*: pick the 34 × 20 mm, 3-across preset; adjust **gap between labels**, **gap between rows** and **left offset** to your roll (measure with a ruler). **Print test label** prints one full row.
+5. Upside down? tick *rotate 180°*. White on black? tick *swap*. Resolution is 203 dpi for the LP 46 Lite (300 dpi models: change it in the same place).
+
 ### Thermal receipt printers (Rongta RP-3200, Epson TM, Xprinter, ...) on Linux
 
 Many receipt printers get a CUPS queue with a **text-only driver** (the options list shows *PrinterEncoding*, *NumLines*, *NumColumns*). Such a queue cannot print a page, so nothing comes out in the normal "Printer driver" mode. The default mode is now **Automatic**: thermal-looking queues (name like RP-3200 / TM-T20 / XP-58, or a text-only/raw driver) are sent as ESC/POS by themselves, other printers use their driver. After every print the app also asks CUPS whether the queue is stopped/disabled and says so instead of showing a plain success. Choose **Settings → Printers → How receipts are sent → Thermal receipt printer - ESC/POS** instead:
