@@ -107,6 +107,69 @@ async function printEscPos(_state: NativeState, html: string, size: '58mm' | '80
   }
 }
 
+/**
+ * Barcode labels on a thermal receipt printer (RP-3200, TM-T20, ...) without a driver: every label is drawn at the
+ * printer's resolution (203 dpi = 8 dots/mm), centred on the paper width and sent as ESC/POS raster, one label after the
+ * other (cut between labels when "cut" is on). Label printers that speak TSPL/ZPL are not covered by this mode.
+ */
+async function printEscPosLabels(html: string, g: { labelWidthMm: number; labelHeightMm: number }, count: number, paper: '58mm' | '80mm', target: PrintTarget & { note?: string }, cut: boolean): Promise<Result> {
+  if (process.platform === 'win32') return err('VALIDATION', 'Thermal (ESC/POS) mode is available on Linux. On Windows install the printer driver and use the "driver" method.');
+  const DPMM = 8;
+  const { dots, printableMm } = THERMAL_PAPER[paper];
+  const wDots = Math.round(g.labelWidthMm * DPMM);
+  const hDots = Math.round(g.labelHeightMm * DPMM);
+  if (wDots > dots) return err('VALIDATION', `The labels are ${g.labelWidthMm} mm wide but the ${paper} paper prints at most ${printableMm} mm. Choose a narrower label size in Products → Barcode labels.`);
+  const zoom = DPMM / (96 / 25.4);
+  const cssLabelH = (g.labelHeightMm * 96) / 25.4;
+  mkdirSync(tempDir(), { recursive: true });
+  const stamp = `${process.pid}-${Date.now()}`;
+  const htmlFile = join(tempDir(), `labels-${stamp}.html`);
+  const binFile = join(tempDir(), `labels-${stamp}.bin`);
+  writeFileSync(htmlFile, html, 'utf8');
+  const win = new BrowserWindow({ show: false, width: wDots, height: hDots, useContentSize: true, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, zoomFactor: zoom } });
+  win.webContents.on('render-process-gone', (_e, d) => log.error('label renderer gone', d));
+  try {
+    win.webContents.setFrameRate(5);
+    await win.loadFile(htmlFile);
+    win.webContents.setZoomFactor(zoom);
+    await win.webContents.insertCSS('.lb{margin:0 !important;box-shadow:none !important}html,body{background:#fff !important;overflow:hidden}');
+    await win.webContents.executeJavaScript('document.fonts ? document.fonts.ready.then(() => true) : true');
+    win.setContentSize(wDots, hDots);
+    await new Promise((res) => setTimeout(res, 600));
+    const left = (dots - wDots) >> 1;
+    const parts: Buffer[] = [];
+    for (let i = 0; i < count; i++) {
+      await win.webContents.executeJavaScript(`window.scrollTo(0, ${i * cssLabelH})`);
+      await new Promise((res) => setTimeout(res, 160));
+      const img = await win.webContents.capturePage();
+      const sz = img.getSize();
+      if (sz.width !== wDots || sz.height < hDots) throw new Error(`Label image has an unexpected size ${sz.width}x${sz.height}`);
+      const gray = bgraToGray(img.toBitmap(), sz.width, sz.height);
+      const page = new Uint8Array(dots * hDots).fill(255); // white, label centred
+      for (let y = 0; y < hDots; y++) page.set(gray.gray.subarray(y * wDots, (y + 1) * wDots), y * dots + left);
+      parts.push(encodeReceipt({ width: dots, height: hDots, gray: page }, { cut, copies: 1, feedLines: 2 }));
+    }
+    writeFileSync(binFile, Buffer.concat(parts));
+    await new Promise<void>((resolve, reject) => {
+      execFile('lp', ['-d', target.deviceName!, '-o', 'raw', '-t', 'Labels', binFile], { timeout: 60000 }, (e, _out, stderr) => {
+        if (e) reject(new Error((stderr || e.message).trim()));
+        else resolve();
+      });
+    });
+    const warn = await queueWarning(target.deviceName!);
+    return ok({ printed: true, printer: target.deviceName ?? null, silent: true, method: 'escpos', note: [target.note, warn].filter(Boolean).join(' ') || null });
+  } catch (e) {
+    log.error('ESC/POS label print failed', e);
+    return err('INTERNAL', `Printing labels failed: ${e instanceof Error ? e.message : String(e)}. Check that the printer is on, has paper and is selected in Settings → Printers.`);
+  } finally {
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.destroy();
+      rmSync(htmlFile, { force: true });
+      rmSync(binFile, { force: true });
+    }, 4000);
+  }
+}
+
 type PrintPage =
   | { kind: 'receipt'; size: ReceiptSize }
   /** Exact page size in micrometres, zero margins (barcode labels: position matters). */
@@ -318,7 +381,14 @@ export async function handleNative(rt: Runtime, state: NativeState, channel: str
         if (built.labels === 0) return err('VALIDATION', 'None of the selected products has a printable barcode.');
         const g = built.geometry;
         const page: PrintPage = p.layout?.kind === 'a4' || (!p.layout && getSetting(rt.db, 'labels.layout').kind === 'a4') ? { kind: 'a4-exact' } : { kind: 'exact', widthMicrons: Math.round(g.pageWidthMm * 1000), heightMicrons: Math.round(g.pageHeightMm * 1000) };
-        const res = await printHtml(state, built.html, page, p.mode, 'barcode-labels.pdf', p.mode === 'print' ? await resolveTarget(rt, state, 'label', p.printer) : undefined);
+        const labelTarget = p.mode === 'print' ? await resolveTarget(rt, state, 'label', p.printer) : undefined;
+        const roll = p.layout?.kind !== 'a4' && !(!p.layout && getSetting(rt.db, 'labels.layout').kind === 'a4');
+        const paperSetting = getSetting(rt.db, 'invoice.receipt_size');
+        // Thermal receipt printers (text-only / raw queues) cannot print a page through their driver: send roll labels as ESC/POS too.
+        const res =
+          labelTarget && roll && (await receiptMethodFor(rt, state, labelTarget)) === 'escpos'
+            ? await printEscPosLabels(built.html, g, built.labels, paperSetting === '58mm' ? '58mm' : '80mm', labelTarget, getSetting(rt.db, 'printing.cut'))
+            : await printHtml(state, built.html, page, p.mode, 'barcode-labels.pdf', labelTarget);
         if (res.ok) {
           const d = res.data as { printed?: boolean; saved?: boolean };
           if (d.printed || d.saved) recordLabelPrint(rt.ctx(), built.labels, p.mode);

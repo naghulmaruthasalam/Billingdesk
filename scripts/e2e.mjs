@@ -445,6 +445,30 @@ try {
       autoJob = readdirSync(dir).filter((f) => f.endsWith('.bin')).length > beforeAuto;
     }
     assert.ok(autoJob, 'automatic mode did not send ESC/POS to the thermal/raw queue');
+    // Barcode labels to the same thermal queue: drawn at 203 dpi, centred, sent as ESC/POS (no driver), and the bars must scan
+    await page.getByLabel('Label printer', { exact: true }).selectOption({ value: rawPrinter });
+    await page.waitForTimeout(500);
+    const beforeLabel = readdirSync(dir).filter((f) => f.endsWith('.bin')).length;
+    await page.getByRole('button', { name: 'Print test label' }).click();
+    let labelFile;
+    for (let i = 0; i < 80 && !labelFile; i++) {
+      await page.waitForTimeout(500);
+      const now = readdirSync(dir).filter((f) => f.endsWith('.bin')).sort();
+      if (now.length > beforeLabel) labelFile = join(dir, now[now.length - 1]);
+    }
+    assert.ok(labelFile, 'no ESC/POS label job arrived at the thermal queue');
+    const lbuf = readFileSync(labelFile);
+    assert.deepEqual([...lbuf.subarray(0, 2)], [0x1b, 0x40], 'label job must start with ESC @');
+    let li = 2, lrows = 0; const lparts = [];
+    while (li < lbuf.length && lbuf[li] === 0x1d && lbuf[li + 1] === 0x76) { const bpr = lbuf[li + 4] | (lbuf[li + 5] << 8), h = lbuf[li + 6] | (lbuf[li + 7] << 8); lparts.push(lbuf.subarray(li + 8, li + 8 + bpr * h)); lrows += h; li += 8 + bpr * h; }
+    assert.equal(lrows, 240, 'one 50 x 30 mm label = 240 rows at 8 dots/mm');
+    const lpbm = join(out, 'escpos-label.pbm');
+    writeFileSync(lpbm, Buffer.concat([Buffer.from(`P4\n576 ${lrows}\n`), ...lparts]));
+    if (hasTool('zbarimg')) {
+      const z = spawnSync('zbarimg', ['-q', '--raw', '-Sdisable', '-Sean13.enable', lpbm], { encoding: 'utf8' });
+      assert.match(z.stdout.trim(), /^\d{13}$/, `the barcode on the thermal label must scan (zbar said: ${JSON.stringify(z.stdout)} ${z.stderr})`);
+    }
+    await page.getByLabel('Label printer', { exact: true }).selectOption({ value: '' });
     // switch back so later steps use the normal driver queue (automatic: a normal printer goes through its driver)
     await page.getByLabel('How receipts are sent').selectOption({ value: 'auto' });
     await page.getByLabel('Receipt printer').selectOption({ value: PRINTER ?? '' });
