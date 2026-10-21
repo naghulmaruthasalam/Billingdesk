@@ -24,6 +24,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 poppler-utils zbar-tools
       - name: A real print queue (CUPS-PDF) so printer selection and silent printing are exercised for real
         run: |
+          sudo add-apt-repository -y universe || true
+          sudo apt-get update
+          apt-cache policy cups-pdf | head -3
           sudo apt-get install -y cups cups-pdf
           sudo cupsd
           sleep 2
