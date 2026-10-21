@@ -7,7 +7,7 @@ import { call, errMsg } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/toast';
 import { useDebounced } from '@/hooks/useApi';
-import { DEFAULT_LABEL_LAYOUT, type LabelLayout } from '@shared/labelHtml';
+import { DEFAULT_LABEL_LAYOUT, LABEL_PRESETS, type LabelLayout } from '@shared/labelHtml';
 import { usePrinterChoice } from '@/components/PrinterPicker';
 
 export interface LabelRun {
@@ -23,15 +23,7 @@ interface Preview {
   skipped: { sku: string; nameEn: string; reason: string }[];
 }
 
-const PRESETS: { id: string; label: string; layout: Partial<LabelLayout> }[] = [
-  { id: 't50x30', label: 'Roll label 50 × 30 mm', layout: { kind: 'thermal', widthMm: 50, heightMm: 30, rollCols: 1 } },
-  { id: 't40x30', label: 'Roll label 40 × 30 mm', layout: { kind: 'thermal', widthMm: 40, heightMm: 30, rollCols: 1 } },
-  { id: 't60x40', label: 'Roll label 60 × 40 mm', layout: { kind: 'thermal', widthMm: 60, heightMm: 40, rollCols: 1 } },
-  { id: 't34x20x3', label: 'Roll 34 × 20 mm, 3 across (TVS LP 46 Lite)', layout: { kind: 'thermal', widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0 } },
-  { id: 'a24', label: 'A4 sticker sheet 3 × 8 (24 labels)', layout: { kind: 'a4', cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0 } },
-  { id: 'a40', label: 'A4 sticker sheet 4 × 10 (40 labels)', layout: { kind: 'a4', cols: 4, rows: 10, marginTopMm: 10, marginLeftMm: 5, gapMm: 0 } },
-  { id: 'a21', label: 'A4 sticker sheet 3 × 7 (21 labels)', layout: { kind: 'a4', cols: 3, rows: 7, marginTopMm: 15, marginLeftMm: 7, gapMm: 0 } },
-];
+const PRESETS = LABEL_PRESETS;
 
 const num = (v: string, fallback: number): number => {
   const n = Number(v);

@@ -91,3 +91,19 @@ describe('roll labels several across (34 x 20 mm, 3 across)', () => {
   });
 
 });
+
+describe('the shop label size', () => {
+  it('new installs start with 34 x 20 mm, 3 across; the old untouched 50 x 30 default is upgraded, a custom layout is kept', async () => {
+    const { makeApp } = await import('./helpers');
+    const { ensureSeeded } = await import('../src/core/seed');
+    const { getSetting } = await import('../src/core/settings');
+    const app = await makeApp();
+    expect(getSetting(app.rt.db, 'labels.layout')).toMatchObject({ kind: 'thermal', widthMm: 34, heightMm: 20, rollCols: 3 });
+    await app.call('settings:update', { patch: { 'labels.layout': DEFAULT_LABEL_LAYOUT } }); // the old generic default (50 x 30, one across)
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'labels.layout')).toMatchObject({ widthMm: 34, heightMm: 20, rollCols: 3 });
+    await app.call('settings:update', { patch: { 'labels.layout': { ...DEFAULT_LABEL_LAYOUT, widthMm: 45, heightMm: 25 } } });
+    ensureSeeded(app.rt.db, new Date());
+    expect(getSetting(app.rt.db, 'labels.layout')).toMatchObject({ widthMm: 45, heightMm: 25, rollCols: 1 });
+  });
+});

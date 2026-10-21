@@ -315,6 +315,8 @@ try {
   await step('barcode labels: print to PDF and decode the bars with an independent scanner', async () => {
     await page.getByRole('link', { name: 'Products' }).click();
     await page.getByRole('tab', { name: 'Barcode labels' }).click();
+    assert.equal(await page.getByLabel('Label type').inputValue(), 't34x20x3', "the shop's own roll (34 x 20 mm, 3 across) is the default label size");
+    await page.getByLabel('Label type').selectOption({ label: 'Roll label 50 × 30 mm' });
     const codes = [await barcodeOf('SK-043'), await barcodeOf('SK-045')];
     for (const [query, product] of [['hydrogen', 'Hydrogen Bomb'], ['classic bomb', 'Classic Bomb']]) {
       await page.getByLabel('Search products for labels').fill(query);
@@ -446,6 +448,7 @@ try {
     }
     assert.ok(autoJob, 'automatic mode did not send ESC/POS to the thermal/raw queue');
     // Barcode labels to the same thermal queue: drawn at 203 dpi, centred, sent as ESC/POS (no driver), and the bars must scan
+    await page.evaluate(() => window.skb.invoke('settings:update', { patch: { 'labels.layout': { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 1, colGapMm: 2, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true } } }));
     await page.getByLabel('Label printer', { exact: true }).selectOption({ value: rawPrinter });
     await page.waitForTimeout(500);
     const beforeLabel = readdirSync(dir).filter((f) => f.endsWith('.bin')).length;
@@ -537,7 +540,7 @@ try {
         assert.equal(z.stdout.trim(), want, `label ${idx + 1} of the row must scan as ${want} (zbar: ${JSON.stringify(z.stdout)})`);
       }
     }
-    await page.evaluate(() => window.skb.invoke('settings:update', { patch: { 'printing.label_method': 'auto', 'labels.layout': { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 1, colGapMm: 2, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true } } }));
+    await page.evaluate(() => window.skb.invoke('settings:update', { patch: { 'printing.label_method': 'auto', 'labels.layout': { kind: 'thermal', widthMm: 34, heightMm: 20, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true } } }));
     await page.getByLabel('Label printer', { exact: true }).selectOption({ value: '' });
     // switch back so later steps use the normal driver queue (automatic: a normal printer goes through its driver)
     await page.getByLabel('How receipts are sent').selectOption({ value: 'auto' });

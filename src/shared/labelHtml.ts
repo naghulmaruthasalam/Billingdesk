@@ -25,6 +25,20 @@ export interface LabelLayout {
 /** 50 x 30 mm roll label is the most common size for 203-dpi thermal label printers. */
 export const DEFAULT_LABEL_LAYOUT: LabelLayout = { kind: 'thermal', widthMm: 50, heightMm: 30, cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0, rollCols: 1, colGapMm: 2, rowGapMm: 2, rollLeftMm: 0, showPrice: true, showTamil: false, showShop: true };
 
+/** The shop's own roll: 34 x 20 mm labels, 3 across (TVS LP 46 Lite). New installs start with this layout. */
+export const SHOP_LABEL_LAYOUT: LabelLayout = { ...DEFAULT_LABEL_LAYOUT, widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0 };
+
+/** Ready-made label sizes (Settings -> Printers and Products -> Barcode labels). */
+export const LABEL_PRESETS: { id: string; label: string; layout: Partial<LabelLayout> }[] = [
+  { id: 't34x20x3', label: 'Roll 34 × 20 mm, 3 across (TVS LP 46 Lite)', layout: { kind: 'thermal', widthMm: 34, heightMm: 20, rollCols: 3, colGapMm: 2.5, rowGapMm: 2, rollLeftMm: 0 } },
+  { id: 't50x30', label: 'Roll label 50 × 30 mm', layout: { kind: 'thermal', widthMm: 50, heightMm: 30, rollCols: 1 } },
+  { id: 't40x30', label: 'Roll label 40 × 30 mm', layout: { kind: 'thermal', widthMm: 40, heightMm: 30, rollCols: 1 } },
+  { id: 't60x40', label: 'Roll label 60 × 40 mm', layout: { kind: 'thermal', widthMm: 60, heightMm: 40, rollCols: 1 } },
+  { id: 'a24', label: 'A4 sticker sheet 3 × 8 (24 labels)', layout: { kind: 'a4', cols: 3, rows: 8, marginTopMm: 10, marginLeftMm: 7, gapMm: 0 } },
+  { id: 'a40', label: 'A4 sticker sheet 4 × 10 (40 labels)', layout: { kind: 'a4', cols: 4, rows: 10, marginTopMm: 10, marginLeftMm: 5, gapMm: 0 } },
+  { id: 'a21', label: 'A4 sticker sheet 3 × 7 (21 labels)', layout: { kind: 'a4', cols: 3, rows: 7, marginTopMm: 15, marginLeftMm: 7, gapMm: 0 } },
+];
+
 export interface LabelItem {
   sku: string;
   nameEn: string;

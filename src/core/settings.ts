@@ -4,7 +4,7 @@ import type { Ctx } from './types';
 import { audit } from './audit';
 import { isoNow } from './time';
 import { AppError } from './errors';
-import { DEFAULT_LABEL_LAYOUT } from '../shared/labelHtml';
+import { DEFAULT_LABEL_LAYOUT, SHOP_LABEL_LAYOUT } from '../shared/labelHtml';
 
 export const labelLayoutSchema = z.object({
   kind: z.enum(['thermal', 'a4']),
@@ -83,7 +83,9 @@ export type SettingKey = keyof typeof SETTINGS_SCHEMA;
 export type SettingValue<K extends SettingKey> = z.infer<(typeof SETTINGS_SCHEMA)[K]>;
 
 /** Defaults shipped in earlier builds. A database that still holds one of these (never edited by the owner) is moved to the current default. */
-export const LEGACY_DEFAULTS: Partial<Record<SettingKey, string[]>> = {
+export const LEGACY_DEFAULTS: Partial<Record<SettingKey, unknown[]>> = {
+  // the old generic default (50 x 30 mm, one label per row); the shop's roll is 34 x 20 mm, 3 across
+  'labels.layout': [DEFAULT_LABEL_LAYOUT],
   'shop.name_en': ['Shree Krishna Pattasu Kadai', 'Sri Krishna Pattasu Kadai', 'Shree Krishna Crackers Shop'],
   'shop.address': [
     '4/210, J.V. Complex, Gurunthasala Nagar, N.G.G.O. Colony Main Road, Kovaipudur, Coimbatore - 641017.',
@@ -128,7 +130,7 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'backup.directory': '',
   'backup.last_auto_date': '',
   'ui.theme': 'light',
-  'labels.layout': DEFAULT_LABEL_LAYOUT,
+  'labels.layout': SHOP_LABEL_LAYOUT,
   'printing.receipt_printer': '',
   'printing.label_printer': '',
   'printing.silent': false,

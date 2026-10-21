@@ -18,7 +18,7 @@ export function ensureSeeded(db: Db, now: Date): { seededProducts: number } {
       const has = db.prepare('SELECT 1 FROM settings WHERE key = ?').get(k);
       if (!has && k !== 'auth.recovery_hash') putSetting(db, now, k, SETTING_DEFAULTS[k] as never);
       const legacy = LEGACY_DEFAULTS[k];
-      if (has && legacy && legacy.includes(getSetting(db, k) as string)) putSetting(db, now, k, SETTING_DEFAULTS[k] as never);
+      if (has && legacy && legacy.some((l) => JSON.stringify(l) === JSON.stringify(getSetting(db, k)))) putSetting(db, now, k, SETTING_DEFAULTS[k] as never);
     }
     if (getSetting(db, 'catalogue.seeded')) return;
     const ts = isoNow(now);

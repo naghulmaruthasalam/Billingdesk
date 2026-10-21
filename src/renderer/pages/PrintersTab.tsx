@@ -1,4 +1,5 @@
 import { looksThermal, resolveReceiptMethod, resolveLabelMethod } from '@shared/printers';
+import { LABEL_PRESETS, type LabelLayout } from '@shared/labelHtml';
 import { useState } from 'react';
 import { Printer, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -142,6 +143,17 @@ export function PrintersTab() {
         <Field label="Barcode label printer">
           <Select value={label} disabled={!manage} onChange={(e) => void save({ 'printing.label_printer': e.target.value })} aria-label="Label printer">
             {options(label)}
+          </Select>
+        </Field>
+        <Field label="Label size (your roll)" hint="Used by Print test label and as the default in Products → Barcode labels">
+          <Select
+            value={LABEL_PRESETS.find((p) => Object.entries(p.layout).every(([k, v]) => settings['labels.layout'][k as keyof LabelLayout] === v))?.id ?? 'custom'}
+            disabled={!manage}
+            onChange={(e) => { const p = LABEL_PRESETS.find((x) => x.id === e.target.value); if (p) void save({ 'labels.layout': { ...settings['labels.layout'], ...p.layout } as LabelLayout }); }}
+            aria-label="Label size"
+          >
+            {LABEL_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            {!LABEL_PRESETS.some((p) => Object.entries(p.layout).every(([k, v]) => settings['labels.layout'][k as keyof LabelLayout] === v)) && <option value="custom">Custom size (set in Products → Barcode labels)</option>}
           </Select>
         </Field>
         <Field label="How labels are sent" hint={labelHint}>
